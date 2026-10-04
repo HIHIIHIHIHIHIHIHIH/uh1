@@ -15,7 +15,7 @@ G2L["1"] = Instance.new("ScreenGui", game:GetService("Players").LocalPlayer:Wait
 G2L["1"]["ZIndexBehavior"] = Enum.ZIndexBehavior.Sibling;
 
 
--- StarterGui.ScreenGui.FrameK
+-- StarterGui.ScreenGui.Frame
 G2L["2"] = Instance.new("Frame", G2L["1"]);
 G2L["2"]["BorderSizePixel"] = 0;
 G2L["2"]["BackgroundColor3"] = Color3.fromRGB(181, 181, 181);
@@ -1999,7 +1999,7 @@ local script = G2L["3d"];
 	-- Also toggle when ' (apostrophe) is pressed
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		if gameProcessed then return end
-		if input.KeyCode == Enum.KeyCode.B then   -- ' key
+		if input.KeyCode == Enum.KeyCode.Quote then   -- ' key
 			toggle()
 		end
 	end)

@@ -1,20 +1,6 @@
--- Prismware Mobile + Tabs
--- Compatible with older executors (no Font.new, no FontFace, no task.defer)
+-- Prismware + Tabs (v4 — no ScrollingFrames, no layout engine, guaranteed visible)
+-- Compatible with old executors: no Font.new, no FontFace, no task.defer, no AutomaticCanvasSize
 
---============================================================
--- SAFE STARTUP
---============================================================
-local function safeCall(label, fn)
-    local ok, err = pcall(fn)
-    if not ok then
-        warn("[Prism] " .. label .. " failed: " .. tostring(err))
-    end
-    return ok, err
-end
-
---============================================================
--- SERVICES
---============================================================
 local Players           = game:GetService("Players")
 local RunService        = game:GetService("RunService")
 local UserInputService  = game:GetService("UserInputService")
@@ -29,14 +15,14 @@ local Camera = Workspace.CurrentCamera
 
 local isMobile = (UserInputService.TouchEnabled == true)
     and (UserInputService.MouseEnabled ~= true)
-
 local viewport = Camera.ViewportSize
-local scaleFactor
+
+-- Window size (fixed, simple)
+local WIN_W, WIN_H = 440, 260
+local scaleFactor = 1
 if isMobile then
-    scaleFactor = math.min(viewport.X / 720, viewport.Y / 480, 1)
+    scaleFactor = math.min(viewport.X / 500, viewport.Y / 320, 1)
     if scaleFactor < 0.6 then scaleFactor = 0.6 end
-else
-    scaleFactor = 1
 end
 
 --============================================================
@@ -46,7 +32,6 @@ local Config = {
     path = "PrismCfg.json",
     data = { toggles = {}, values = { speed = 23, tpwalk = 60 } },
 }
-
 function Config:save()
     pcall(function()
         if type(writefile) == "function" then
@@ -54,7 +39,6 @@ function Config:save()
         end
     end)
 end
-
 function Config:load()
     pcall(function()
         if type(isfile) == "function" and type(readfile) == "function"
@@ -65,12 +49,10 @@ function Config:load()
         end
     end)
 end
-
 function Config:get(n)         return self.data.toggles[n] == true end
 function Config:set(n, s)      self.data.toggles[n] = s; self:save() end
 function Config:getValue(k)    return self.data.values[k] end
 function Config:setValue(k, v) self.data.values[k] = v; self:save() end
-
 Config:load()
 
 --============================================================
@@ -78,16 +60,11 @@ Config:load()
 --============================================================
 local Modules, Cleanups = {}, {}
 local function register(name, fn) Modules[name] = fn end
-
 local function runModule(name, state)
     if not Modules[name] then return false end
     if Cleanups[name] then pcall(Cleanups[name]); Cleanups[name] = nil end
     local ok, res = pcall(Modules[name], state)
-    if not ok then
-        warn("[" .. name .. "] " .. tostring(res))
-        Config:set(name, false)
-        return false
-    end
+    if not ok then warn("[" .. name .. "] " .. tostring(res)); Config:set(name, false); return false end
     if state and type(res) == "function" then Cleanups[name] = res end
     return true
 end
@@ -107,20 +84,20 @@ Container.Size = UDim2.new(1, 0, 1, 0)
 Container.BackgroundTransparency = 1
 Container.Parent = ScreenGui
 
-local uiScale = Instance.new("UIScale")
-uiScale.Scale = scaleFactor
-uiScale.Parent = Container
+if isMobile then
+    local s = Instance.new("UIScale")
+    s.Scale = scaleFactor
+    s.Parent = Container
+end
 
 -- Main frame
-local BASE_W, BASE_H = 480, 320
-
 local Main = Instance.new("Frame")
 Main.Name = "Main"
 Main.BackgroundColor3 = Color3.fromRGB(181, 181, 181)
 Main.BackgroundTransparency = 0
 Main.BorderSizePixel = 0
-Main.Position = UDim2.new(0, 20, 0, 60)
-Main.Size = UDim2.new(0, BASE_W, 0, BASE_H)
+Main.Position = UDim2.new(0, 30, 0, 60)
+Main.Size = UDim2.new(0, WIN_W, 0, WIN_H)
 Main.Parent = Container
 
 local corner = Instance.new("UICorner")
@@ -135,41 +112,35 @@ stroke.Parent = Main
 local strokeGrad = Instance.new("UIGradient")
 strokeGrad.Rotation = -90
 strokeGrad.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0.000, Color3.fromRGB(94, 66, 88)),
-    ColorSequenceKeypoint.new(1.000, Color3.fromRGB(169, 203, 187))
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(94, 66, 88)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(169, 203, 187))
 }
 strokeGrad.Parent = stroke
 
 local mainGrad = Instance.new("UIGradient")
 mainGrad.Rotation = -90
 mainGrad.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0.000, Color3.fromRGB(94, 66, 88)),
-    ColorSequenceKeypoint.new(1.000, Color3.fromRGB(169, 203, 187))
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(94, 66, 88)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(169, 203, 187))
 }
 mainGrad.Parent = Main
 
 --============================================================
--- TITLE BAR
+-- TITLE BAR (y=6, h=26)
 --============================================================
-local TITLE_H = 26
-
 local TitleBar = Instance.new("Frame")
 TitleBar.Name = "TitleBar"
 TitleBar.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
 TitleBar.BackgroundTransparency = 0.26
 TitleBar.BorderSizePixel = 0
 TitleBar.Position = UDim2.new(0, 6, 0, 6)
-TitleBar.Size = UDim2.new(1, -12, 0, TITLE_H)
+TitleBar.Size = UDim2.new(1, -12, 0, 26)
 TitleBar.Parent = Main
 
-local tbCorner = Instance.new("UICorner")
-tbCorner.CornerRadius = UDim.new(0, 6)
-tbCorner.Parent = TitleBar
-
-local tbStroke = Instance.new("UIStroke")
-tbStroke.Thickness = 2.4
-tbStroke.Color = Color3.fromRGB(86, 86, 86)
-tbStroke.Parent = TitleBar
+Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 6)
+local tbs = Instance.new("UIStroke", TitleBar)
+tbs.Thickness = 2.4
+tbs.Color = Color3.fromRGB(86, 86, 86)
 
 local TitleLbl = Instance.new("TextLabel")
 TitleLbl.BackgroundTransparency = 1
@@ -182,7 +153,6 @@ TitleLbl.Position = UDim2.new(0, 8, 0, 0)
 TitleLbl.Size = UDim2.new(1, -80, 1, 0)
 TitleLbl.Parent = TitleBar
 
--- Close button
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
 CloseBtn.BackgroundTransparency = 0.26
@@ -194,100 +164,38 @@ CloseBtn.BorderSizePixel = 0
 CloseBtn.Position = UDim2.new(1, -24, 0, 3)
 CloseBtn.Size = UDim2.new(0, 20, 0, 20)
 CloseBtn.Parent = TitleBar
-
-local cbCorner = Instance.new("UICorner")
-cbCorner.CornerRadius = UDim.new(0, 4)
-cbCorner.Parent = CloseBtn
-
-local cbStroke = Instance.new("UIStroke")
-cbStroke.Thickness = 2.4
-cbStroke.Color = Color3.fromRGB(86, 86, 86)
-cbStroke.Parent = CloseBtn
-
--- Reopen button
-local ReopenBtn = Instance.new("TextButton")
-ReopenBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-ReopenBtn.BackgroundTransparency = 0.15
-ReopenBtn.Text = "P"
-ReopenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ReopenBtn.Font = Enum.Font.SourceSansPro
-ReopenBtn.TextSize = 22
-ReopenBtn.BorderSizePixel = 0
-ReopenBtn.Position = UDim2.new(0, 20, 0.4, 0)
-ReopenBtn.Size = UDim2.new(0, 46, 0, 46)
-ReopenBtn.Visible = false
-ReopenBtn.Parent = Container
-
-local rbCorner = Instance.new("UICorner")
-rbCorner.CornerRadius = UDim.new(0, 8)
-rbCorner.Parent = ReopenBtn
-
-local rbStroke = Instance.new("UIStroke")
-rbStroke.Thickness = 3
-rbStroke.Color = Color3.fromRGB(255, 255, 255)
-rbStroke.Parent = ReopenBtn
-
-local rbGrad = Instance.new("UIGradient")
-rbGrad.Rotation = -90
-rbGrad.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0.000, Color3.fromRGB(94, 66, 88)),
-    ColorSequenceKeypoint.new(1.000, Color3.fromRGB(169, 203, 187))
-}
-rbGrad.Parent = rbStroke
-
-CloseBtn.MouseButton1Click:Connect(function()
-    Main.Visible = false
-    ReopenBtn.Visible = true
-end)
-ReopenBtn.MouseButton1Click:Connect(function()
-    Main.Visible = true
-    ReopenBtn.Visible = false
-end)
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 4)
+local cbs = Instance.new("UIStroke", CloseBtn)
+cbs.Thickness = 2.4
+cbs.Color = Color3.fromRGB(86, 86, 86)
 
 --============================================================
--- TAB BAR
+-- TAB BAR (y=36, h=22) — regular Frame, manual positioning
 --============================================================
-local TAB_H = 22
-
-local TabBar = Instance.new("ScrollingFrame")
+local TabBar = Instance.new("Frame")
 TabBar.Name = "TabBar"
 TabBar.BackgroundTransparency = 1
-TabBar.BorderSizePixel = 0
-TabBar.ScrollBarThickness = 0
-TabBar.ScrollingDirection = Enum.ScrollingDirection.X
-TabBar.CanvasSize = UDim2.new(0, 0, 0, 0)
-TabBar.Position = UDim2.new(0, 6, 0, 6 + TITLE_H + 3)
-TabBar.Size = UDim2.new(1, -12, 0, TAB_H)
+TabBar.Position = UDim2.new(0, 6, 0, 36)
+TabBar.Size = UDim2.new(1, -12, 0, 22)
 TabBar.Parent = Main
 
-local tabLayout = Instance.new("UIListLayout")
-tabLayout.FillDirection = Enum.FillDirection.Horizontal
-tabLayout.Padding = UDim.new(0, 3)
-tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-tabLayout.Parent = TabBar
-
 --============================================================
--- CONTENT
+-- CONTENT (y=62, height = WIN_H - 68)
 --============================================================
-local CONTENT_TOP = 6 + TITLE_H + 3 + TAB_H + 3
-
 local Content = Instance.new("Frame")
 Content.Name = "Content"
 Content.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
 Content.BackgroundTransparency = 0.26
 Content.BorderSizePixel = 0
-Content.Position = UDim2.new(0, 6, 0, CONTENT_TOP)
-Content.Size = UDim2.new(1, -12, 1, -(CONTENT_TOP + 6))
+Content.Position = UDim2.new(0, 6, 0, 62)
+Content.Size = UDim2.new(1, -12, 0, WIN_H - 68)
+Content.ClipsDescendants = true
 Content.Parent = Main
 
-local contCorner = Instance.new("UICorner")
-contCorner.CornerRadius = UDim.new(0, 6)
-contCorner.Parent = Content
-
-local contStroke = Instance.new("UIStroke")
-contStroke.Thickness = 2.4
-contStroke.Color = Color3.fromRGB(86, 86, 86)
-contStroke.Parent = Content
+Instance.new("UICorner", Content).CornerRadius = UDim.new(0, 6)
+local cs = Instance.new("UIStroke", Content)
+cs.Thickness = 2.4
+cs.Color = Color3.fromRGB(86, 86, 86)
 
 --============================================================
 -- STYLE HELPER
@@ -301,96 +209,62 @@ local function applyPrismStyle(btn)
     btn.TextSize = 13
     btn.TextXAlignment = Enum.TextXAlignment.Center
 
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 4)
-    c.Parent = btn
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
 
-    local s = Instance.new("UIStroke")
+    local s = Instance.new("UIStroke", btn)
     s.Thickness = 2.4
     s.Color = Color3.fromRGB(86, 86, 86)
-    s.Parent = btn
 
-    local g = Instance.new("UIGradient")
+    local g = Instance.new("UIGradient", btn)
     g.Rotation = -90
     g.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0.000, Color3.fromRGB(27, 39, 19)),
-        ColorSequenceKeypoint.new(1.000, Color3.fromRGB(227, 234, 178))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(27, 39, 19)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(227, 234, 178))
     }
-    g.Parent = btn
 end
 
 --============================================================
--- PAGE SYSTEM
+-- PAGE SYSTEM — every widget belongs to a tab
 --============================================================
-local Pages      = {}
-local TabButtons = {}
-local TabOrder   = {}
-local ActiveTab  = nil
+local Tabs = {}          -- tabname -> { widgets = {...}, tabBtn = ... }
+local ActiveTab = "Main"
 
-local CELL_W, CELL_H = 112, 26
-local CELL_PAD = 4
-
-local function buildPage(name)
-    local page = Instance.new("ScrollingFrame")
-    page.Name = name
-    page.BackgroundTransparency = 1
-    page.BorderSizePixel = 0
-    page.ScrollBarThickness = 4
-    page.ScrollBarImageColor3 = Color3.fromRGB(180, 180, 180)
-    page.ScrollingDirection = Enum.ScrollingDirection.Y
-    page.Position = UDim2.new(0, 4, 0, 4)
-    page.Size = UDim2.new(1, -8, 1, -8)
-    page.CanvasSize = UDim2.new(0, 0, 0, 0)
-    page.Visible = false
-    page.Parent = Content
-
-    local grid = Instance.new("UIGridLayout")
-    grid.CellSize = UDim2.new(0, CELL_W, 0, CELL_H)
-    grid.CellPadding = UDim2.new(0, CELL_PAD, 0, CELL_PAD)
-    grid.SortOrder = Enum.SortOrder.LayoutOrder
-    grid.HorizontalAlignment = Enum.HorizontalAlignment.Left
-    grid.VerticalAlignment = Enum.VerticalAlignment.Top
-    grid.Parent = page
-
-    Pages[name] = page
-    table.insert(TabOrder, name)
-    return page
+local function registerWidget(tabName, widget)
+    if not Tabs[tabName] then Tabs[tabName] = { widgets = {} } end
+    table.insert(Tabs[tabName].widgets, widget)
+    widget.Visible = (tabName == ActiveTab)
 end
 
-local function buildTabButton(name, order)
-    local b = Instance.new("TextButton")
-    b.Name = name
-    b.Text = name
-    b.LayoutOrder = order
-    b.Size = UDim2.new(0, 72, 1, 0)
-    applyPrismStyle(b)
-    b.TextSize = 12
-    b.Parent = TabBar
-
-    b.MouseButton1Click:Connect(function()
-        for n, p in pairs(Pages) do p.Visible = (n == name) end
-        ActiveTab = name
-        for n, btn in pairs(TabButtons) do
-            TweenService:Create(btn, TweenInfo.new(0.15), {
-                BackgroundColor3 = (n == name)
+local function switchTab(name)
+    ActiveTab = name
+    for tname, tab in pairs(Tabs) do
+        local visible = (tname == name)
+        for _, w in ipairs(tab.widgets) do
+            w.Visible = visible
+        end
+    end
+    for tname, tab in pairs(Tabs) do
+        if tab.tabBtn then
+            TweenService:Create(tab.tabBtn, TweenInfo.new(0.12), {
+                BackgroundColor3 = (tname == name)
                     and Color3.fromRGB(120, 100, 130)
                     or  Color3.fromRGB(70, 70, 70),
             }):Play()
         end
-    end)
-
-    TabButtons[name] = b
+    end
 end
 
 --============================================================
--- WIDGETS
+-- WIDGET CREATORS (all children of Content, manual position)
 --============================================================
-local function createToggle(page, name)
+local function makeToggle(tabName, name, x, y, w, h)
     local b = Instance.new("TextButton")
     b.Text = name
-    b.Size = UDim2.new(1, 0, 1, 0)
+    b.Position = UDim2.new(0, x, 0, y)
+    b.Size = UDim2.new(0, w, 0, h or 24)
     applyPrismStyle(b)
-    b.Parent = page
+    b.Parent = Content
+    registerWidget(tabName, b)
 
     local dot = Instance.new("Frame")
     dot.Size = UDim2.new(0, 8, 0, 8)
@@ -398,10 +272,7 @@ local function createToggle(page, name)
     dot.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
     dot.BorderSizePixel = 0
     dot.Parent = b
-
-    local dc = Instance.new("UICorner")
-    dc.CornerRadius = UDim.new(1, 0)
-    dc.Parent = dot
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
 
     local state = Config:get(name)
     local function refresh()
@@ -430,34 +301,45 @@ local function createToggle(page, name)
         Config:set(name, state)
         refresh()
     end)
+
+    return b
 end
 
-local function createInput(page, label, defaultVal, key)
+local function makeActionButton(tabName, name, x, y, w, h, onClick)
+    local b = Instance.new("TextButton")
+    b.Text = name
+    b.Position = UDim2.new(0, x, 0, y)
+    b.Size = UDim2.new(0, w, 0, h or 24)
+    applyPrismStyle(b)
+    b.Parent = Content
+    registerWidget(tabName, b)
+    b.MouseButton1Click:Connect(onClick)
+    return b
+end
+
+local function makeInput(tabName, label, defaultVal, key, x, y, w, h)
     local holder = Instance.new("Frame")
-    holder.Size = UDim2.new(1, 0, 1, 0)
+    holder.Position = UDim2.new(0, x, 0, y)
+    holder.Size = UDim2.new(0, w, 0, h or 40)
     holder.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
     holder.BackgroundTransparency = 0.26
     holder.BorderSizePixel = 0
-    holder.Parent = page
-
-    local hc = Instance.new("UICorner")
-    hc.CornerRadius = UDim.new(0, 4)
-    hc.Parent = holder
-
-    local hs = Instance.new("UIStroke")
+    holder.Parent = Content
+    Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 4)
+    local hs = Instance.new("UIStroke", holder)
     hs.Thickness = 2.4
     hs.Color = Color3.fromRGB(86, 86, 86)
-    hs.Parent = holder
+    registerWidget(tabName, holder)
 
     local lbl = Instance.new("TextLabel")
     lbl.BackgroundTransparency = 1
     lbl.Text = label
     lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
     lbl.Font = Enum.Font.SourceSansPro
-    lbl.TextSize = 10
+    lbl.TextSize = 11
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Position = UDim2.new(0, 6, 0, 1)
-    lbl.Size = UDim2.new(1, -12, 0, 11)
+    lbl.Size = UDim2.new(1, -12, 0, 14)
     lbl.Parent = holder
 
     local box = Instance.new("TextBox")
@@ -466,33 +348,51 @@ local function createInput(page, label, defaultVal, key)
     box.Text = tostring(defaultVal)
     box.TextColor3 = Color3.fromRGB(255, 255, 255)
     box.Font = Enum.Font.Code
-    box.TextSize = 12
+    box.TextSize = 13
     box.BorderSizePixel = 0
     box.ClearTextOnFocus = false
-    box.Position = UDim2.new(0, 6, 0, 13)
-    box.Size = UDim2.new(1, -12, 0, 12)
+    box.Position = UDim2.new(0, 6, 0, 16)
+    box.Size = UDim2.new(1, -12, 0, (h or 40) - 20)
     box.Parent = holder
-
-    local bc = Instance.new("UICorner")
-    bc.CornerRadius = UDim.new(0, 3)
-    bc.Parent = box
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 3)
 
     box.FocusLost:Connect(function()
         local num = tonumber(box.Text)
         if num then
             Config:setValue(key, num)
-            print(label .. " = " .. tostring(num))
+            print("[Prism] " .. label .. " = " .. tostring(num))
         else
             box.Text = tostring(Config:getValue(key))
         end
     end)
+
+    return holder
+end
+
+--============================================================
+-- TAB BUTTONS
+--============================================================
+local TAB_NAMES = { "Main", "Blatant", "Settings" }
+local TAB_W, TAB_GAP = 100, 4
+
+for i, name in ipairs(TAB_NAMES) do
+    Tabs[name] = Tabs[name] or { widgets = {} }
+    local b = Instance.new("TextButton")
+    b.Text = name
+    b.Position = UDim2.new(0, (i - 1) * (TAB_W + TAB_GAP), 0, 0)
+    b.Size = UDim2.new(0, TAB_W, 1, 0)
+    b.TextSize = 12
+    applyPrismStyle(b)
+    b.Parent = TabBar
+    Tabs[name].tabBtn = b
+    b.MouseButton1Click:Connect(function() switchTab(name) end)
 end
 
 --============================================================
 -- MODULES
 --============================================================
 
--- VAPE SPEED
+-- VAPE SPEED (from Blatant/Speed.lua)
 register("VapeSpeed", function(state)
     if not state then
         local c = lplr.Character
@@ -502,7 +402,6 @@ register("VapeSpeed", function(state)
         end
         return
     end
-
     local rayCheck = RaycastParams.new()
     rayCheck.RespectCanCollide = true
     local frictionParts = {}
@@ -536,20 +435,16 @@ register("VapeSpeed", function(state)
         if not root or not hum or hum.Health <= 0 then return end
         local st = hum:GetState()
         if st == Enum.HumanoidStateType.Climbing then return end
-
         local velo = (root.AssemblyLinearVelocity * Vector3.new(1,0,1)).Magnitude
         local moveDir = hum.MoveDirection
         local target = Config:getValue("speed") or 23
         local dest = moveDir * math.max(target - velo, 0) * dt
-
         rayCheck.FilterDescendantsInstances = { c, Workspace.CurrentCamera }
         rayCheck.CollisionGroup = root.CollisionGroup
         local ray = Workspace:Raycast(root.Position, dest, rayCheck)
         if ray then dest = (ray.Position + ray.Normal) - root.Position end
-
         root.CFrame = root.CFrame + dest
         root.AssemblyLinearVelocity = (moveDir * velo) + Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
-
         if (st == Enum.HumanoidStateType.Running or st == Enum.HumanoidStateType.Landed)
             and moveDir ~= Vector3.zero then
             hum:ChangeState(Enum.HumanoidStateType.Jumping)
@@ -564,16 +459,13 @@ register("Killaura", function(state)
     local remote = ReplicatedStorage:FindFirstChild("AttackEntity", true)
         or ReplicatedStorage:FindFirstChild("SwordRemote", true)
     if not remote then warn("Killaura: remote not found") return end
-
     local conn = RunService.Heartbeat:Connect(function()
         local c = lplr.Character
         if not c or not c.PrimaryPart then return end
         local tool = c:FindFirstChildWhichIsA("Tool")
         if not tool then return end
-
         local selfpos = c.PrimaryPart.Position
         local facing = c.PrimaryPart.CFrame.LookVector * Vector3.new(1,0,1)
-
         local best, bestD = nil, math.huge
         for _, p in ipairs(Players:GetPlayers()) do
             if p == lplr or not p.Character or not p.Character.PrimaryPart then continue end
@@ -586,7 +478,6 @@ register("Killaura", function(state)
             if ang > math.rad(180) then continue end
             if d < bestD then best, bestD = p, d end
         end
-
         if best then
             local tr = best.Character.PrimaryPart
             local dir = CFrame.lookAt(selfpos, tr.Position).LookVector
@@ -622,13 +513,11 @@ register("Fly", function(state)
     end
     local c = lplr.Character
     if not c or not c.PrimaryPart then return end
-
     local bv = Instance.new("BodyVelocity")
     bv.Name = "PrismFly"
     bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
     bv.Velocity = Vector3.zero
     bv.Parent = c.PrimaryPart
-
     local cam = Workspace.CurrentCamera
     local conn = RunService.PreSimulation:Connect(function()
         local ch = lplr.Character
@@ -668,7 +557,7 @@ register("VapeNoFall", function(state)
     return function() conn:Disconnect() end
 end)
 
--- TPWALK
+-- TPWALK VAPE
 register("TPWalkVape", function(state)
     if not state then return end
     local conn = RunService.Heartbeat:Connect(function(dt)
@@ -684,7 +573,7 @@ register("TPWalkVape", function(state)
     return function() conn:Disconnect() end
 end)
 
--- FALLBACK MODULES
+-- Fallbacks
 register("TriggerBot", function(state)
     if not state then return end
     local mouse = lplr:GetMouse()
@@ -759,7 +648,6 @@ register("Spider", function(state)
     end)
     return function() conn:Disconnect() end
 end)
-
 register("CityBoiAura", function(state) end)
 register("FarJump", function(state) end)
 register("Anti Fall", function(state) end)
@@ -795,43 +683,13 @@ register("TPNear AC", function(state) end)
 register("ACV2", function(state) end)
 
 --============================================================
--- BUILD TABS
+-- BUILD MAIN TAB (original Prismware layout)
 --============================================================
-buildPage("Main")
-buildPage("Blatant")
-buildPage("Settings")
-
-buildTabButton("Main", 1)
-buildTabButton("Blatant", 2)
-buildTabButton("Settings", 3)
-
--- MAIN
-createToggle(Pages["Main"], "TriggerBot")
-createToggle(Pages["Main"], "TPWalk")
-createToggle(Pages["Main"], "JitterMove")
-createToggle(Pages["Main"], "Theme")
-createToggle(Pages["Main"], "MiniGlide")
-createToggle(Pages["Main"], "Spider")
-createToggle(Pages["Main"], "CityBoiAura")
-createToggle(Pages["Main"], "FarJump")
-createToggle(Pages["Main"], "Anti Fall")
-createToggle(Pages["Main"], "StiffSpeed")
-createToggle(Pages["Main"], "FastClick")
-createToggle(Pages["Main"], "Speed")
-createToggle(Pages["Main"], "ACPrivate")
-createToggle(Pages["Main"], "NoFall")
-createToggle(Pages["Main"], "SpoofAC")
-createToggle(Pages["Main"], "SemiDisabler")
-createToggle(Pages["Main"], "TPNear AC")
-createToggle(Pages["Main"], "ACV2")
-
--- PlayerPull button
-local playerPullBtn = Instance.new("TextButton")
-playerPullBtn.Text = "PlayerPull"
-playerPullBtn.Size = UDim2.new(1, 0, 1, 0)
-applyPrismStyle(playerPullBtn)
-playerPullBtn.Parent = Pages["Main"]
-playerPullBtn.MouseButton1Click:Connect(function()
+-- Column 1 (x=6, w=98)
+makeToggle("Main", "TriggerBot",  6,   6, 98)
+makeToggle("Main", "TPWalk",      6,  32, 98)
+makeToggle("Main", "JitterMove",  6,  58, 98)
+makeActionButton("Main", "PlayerPull", 6, 84, 98, 24, function()
     for _, p in Players:GetPlayers() do
         if p ~= lplr and p.Character and p.Character:FindFirstChild("HumanoidRootPart")
             and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") then
@@ -847,89 +705,62 @@ playerPullBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- BLATANT
-createToggle(Pages["Blatant"], "VapeSpeed")
-createToggle(Pages["Blatant"], "Killaura")
-createToggle(Pages["Blatant"], "Fly")
-createToggle(Pages["Blatant"], "VapeNoFall")
-createToggle(Pages["Blatant"], "TPWalkVape")
-createInput(Pages["Blatant"], "Speed (studs/sec)",  Config:getValue("speed") or 23, "speed")
-createInput(Pages["Blatant"], "TPWalk (studs/sec)", Config:getValue("tpwalk") or 60, "tpwalk")
+-- Column 2 (x=110, w=98)
+makeToggle("Main", "Theme",      110,   6, 98)
+makeToggle("Main", "MiniGlide",  110,  32, 98)
+makeToggle("Main", "Spider",     110,  58, 98)
+makeToggle("Main", "CityBoiAura",110,  84, 98)
 
--- SETTINGS
-local function makeSettingsBtn(text, order, cb)
-    local b = Instance.new("TextButton")
-    b.Text = text
-    b.LayoutOrder = order
-    b.Size = UDim2.new(1, 0, 1, 0)
-    applyPrismStyle(b)
-    b.Parent = Pages["Settings"]
-    b.MouseButton1Click:Connect(cb)
-    return b
-end
+-- Column 3 (x=214, w=88)
+makeToggle("Main", "FarJump",    214,   6, 88)
+makeToggle("Main", "Anti Fall",  214,  32, 88)
+makeToggle("Main", "StiffSpeed", 214,  58, 88)
+makeToggle("Main", "FastClick",  214,  84, 88)
 
-makeSettingsBtn("Refresh / Fit Window", 1, function()
-    local maxContentH, maxContentW = 0, 0
-    for _, page in pairs(Pages) do
-        local grid = page:FindFirstChildOfClass("UIGridLayout")
-        if grid then
-            local cs = grid.AbsoluteContentSize
-            if cs.Y > maxContentH then maxContentH = cs.Y end
-            if cs.X > maxContentW then maxContentW = cs.X end
-        end
-    end
-    local newW = math.clamp(maxContentW + 30, 300, 520)
-    local newH = math.clamp(maxContentH + CONTENT_TOP + 30, 200,
-        (viewport.Y / scaleFactor) - 80)
-    TweenService:Create(Main, TweenInfo.new(0.25), {
-        Size = UDim2.new(0, newW, 0, newH)
-    }):Play()
-    print("[Prism] Fitted: " .. math.floor(newW) .. "x" .. math.floor(newH))
+-- Column 4 (x=308, w=76)
+makeToggle("Main", "Speed",      308,   6, 76)
+makeToggle("Main", "ACPrivate",  308,  32, 76)
+makeToggle("Main", "NoFall",     308,  58, 76)
+makeToggle("Main", "ACV2",       308,  84, 76)
+
+-- Row 5 (y=112)
+makeToggle("Main", "SpoofAC",      6, 112, 98)
+makeToggle("Main", "SemiDisabler",110, 112, 98)
+makeToggle("Main", "TPNear AC",  214, 112, 88)
+
+--============================================================
+-- BUILD BLATANT TAB (real VapeV4 modules)
+--============================================================
+makeToggle("Blatant", "VapeSpeed",   6,   6, 110)
+makeToggle("Blatant", "Killaura",    6,  32, 110)
+makeToggle("Blatant", "Fly",         6,  58, 110)
+makeToggle("Blatant", "VapeNoFall",  6,  84, 110)
+makeToggle("Blatant", "TPWalkVape",  6, 110, 110)
+
+makeInput("Blatant", "Speed (studs/sec)",  Config:getValue("speed") or 23,  "speed",  130,  6, 190, 42)
+makeInput("Blatant", "TPWalk (studs/sec)", Config:getValue("tpwalk") or 60, "tpwalk", 130, 54, 190, 42)
+
+--============================================================
+-- BUILD SETTINGS TAB
+--============================================================
+makeActionButton("Settings", "Refresh Window", 6, 6, 200, 24, function()
+    print("[Prism] Refreshed UI")
 end)
-makeSettingsBtn("Save Config", 2, function() Config:save(); print("[Prism] Saved") end)
-makeSettingsBtn("Load Config", 3, function() Config:load(); print("[Prism] Loaded") end)
-makeSettingsBtn("Reset All Modules", 4, function()
+makeActionButton("Settings", "Save Config",  6, 32, 200, 24, function()
+    Config:save()
+    print("[Prism] Config saved")
+end)
+makeActionButton("Settings", "Load Config",  6, 58, 200, 24, function()
+    Config:load()
+    print("[Prism] Config loaded")
+end)
+makeActionButton("Settings", "Reset All",    6, 84, 200, 24, function()
     for name in pairs(Modules) do
         if Cleanups[name] then pcall(Cleanups[name]); Cleanups[name] = nil end
         Config.data.toggles[name] = false
     end
     Config:save()
-    print("[Prism] Reset")
-end)
-
---============================================================
--- TAB SWITCH + INITIAL REFRESH
---============================================================
-ActiveTab = "Main"
-for n, p in pairs(Pages) do p.Visible = (n == "Main") end
-if TabButtons["Main"] then
-    TabButtons["Main"].BackgroundColor3 = Color3.fromRGB(120, 100, 130)
-end
-
--- Update canvas for each page after layout settles
-task.spawn(function()
-    task.wait(0.3)
-    for _, page in pairs(Pages) do
-        local grid = page:FindFirstChildOfClass("UIGridLayout")
-        if grid then
-            page.CanvasSize = UDim2.new(0, 0, 0, grid.AbsoluteContentSize.Y + 8)
-        end
-    end
-    -- Fit window
-    local maxContentH, maxContentW = 0, 0
-    for _, page in pairs(Pages) do
-        local grid = page:FindFirstChildOfClass("UIGridLayout")
-        if grid then
-            local cs = grid.AbsoluteContentSize
-            if cs.Y > maxContentH then maxContentH = cs.Y end
-            if cs.X > maxContentW then maxContentW = cs.X end
-        end
-    end
-    local newW = math.clamp(maxContentW + 30, 300, 520)
-    local newH = math.clamp(maxContentH + CONTENT_TOP + 30, 200,
-        (viewport.Y / scaleFactor) - 80)
-    Main.Size = UDim2.new(0, newW, 0, newH)
-    print("[Prism] Auto-fit -> " .. math.floor(newW) .. "x" .. math.floor(newH))
+    print("[Prism] Reset all modules")
 end)
 
 --============================================================
@@ -937,7 +768,6 @@ end)
 --============================================================
 do
     local dragging, dragStart, startPos
-
     TitleBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch then
@@ -946,7 +776,6 @@ do
             startPos = Main.Position
         end
     end)
-
     UserInputService.InputChanged:Connect(function(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
             or input.UserInputType == Enum.UserInputType.Touch) then
@@ -956,7 +785,6 @@ do
                 startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
-
     UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch then
@@ -966,13 +794,17 @@ do
 end
 
 --============================================================
+-- SHOW DEFAULT TAB
+--============================================================
+switchTab("Main")
+
+--============================================================
 -- KEYBIND
 --============================================================
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
         Main.Visible = not Main.Visible
-        ReopenBtn.Visible = not Main.Visible
     end
 end)
 

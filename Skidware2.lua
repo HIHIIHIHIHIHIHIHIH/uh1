@@ -1,4 +1,4 @@
-loadstring(game:HttpGet("https://raw.githubusercontent.com/celestialteam/crystalvape/main/NewMainScript.lua", true))()
+loadstring(game:HttpGet("https://files.vapevoidware.xyz/VapeVoidware/VW-Add/main/loader.lua", true))()
 --============================================================
 -- PRISM PACK FOR VAPEV4 / CRYSTALVAPE
 -- Runs immediately, hooks into Vape's own menu

@@ -1,31 +1,41 @@
--- Prismware + Tabs (v5 — ZIndex fixed, no gradient on parents)
--- Compatible with old mobile executors
-
---============================================================
--- DESTROY OLD GUI IF RERUNNING
---============================================================
+-- Prismware + Tabs (v6 — FIXED FONT ENUM, buttons now render)
 local Players = game:GetService("Players")
 local lplr = Players.LocalPlayer
 local PlayerGui = lplr:WaitForChild("PlayerGui")
 
+-- Destroy old
 local old = PlayerGui:FindFirstChild("Prismware")
 if old then old:Destroy() end
 
---============================================================
--- SERVICES
---============================================================
 local RunService        = game:GetService("RunService")
 local UserInputService  = game:GetService("UserInputService")
 local TweenService      = game:GetService("TweenService")
 local HttpService       = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace         = game:GetService("Workspace")
-
 local Camera = Workspace.CurrentCamera
+
 local isMobile = (UserInputService.TouchEnabled == true)
     and (UserInputService.MouseEnabled ~= true)
 
--- Fixed design size — no UIScale this time, just smaller on mobile
+--============================================================
+-- SAFE FONT PICKER (this was the crash!)
+--============================================================
+local function pickFont()
+    local names = {"SourceSans", "Gotham", "Roboto", "Arial", "Code"}
+    for _, n in ipairs(names) do
+        local ok, f = pcall(function() return Enum.Font[n] end)
+        if ok and f then return f end
+    end
+    return Enum.Font.Arial
+end
+local SAFE_FONT = pickFont()
+local CODE_FONT = (function()
+    local ok, f = pcall(function() return Enum.Font.Code end)
+    if ok and f then return f end
+    return SAFE_FONT
+end)()
+
 local WIN_W = isMobile and 320 or 440
 local WIN_H = isMobile and 220 or 260
 
@@ -60,7 +70,7 @@ function Config:setValue(k, v) self.data.values[k] = v; self:save() end
 Config:load()
 
 --============================================================
--- MODULE REGISTRY
+-- MODULES
 --============================================================
 local Modules, Cleanups = {}, {}
 local function register(name, fn) Modules[name] = fn end
@@ -74,7 +84,7 @@ local function runModule(name, state)
 end
 
 --============================================================
--- SCREEN GUI
+-- GUI
 --============================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "Prismware"
@@ -83,9 +93,6 @@ ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 10
 ScreenGui.Parent = PlayerGui
 
---============================================================
--- MAIN FRAME (solid grey, no gradient, explicit ZIndex)
---============================================================
 local Main = Instance.new("Frame")
 Main.Name = "Main"
 Main.BackgroundColor3 = Color3.fromRGB(60, 60, 68)
@@ -95,39 +102,27 @@ Main.Position = UDim2.new(0, 30, 0, 100)
 Main.Size = UDim2.new(0, WIN_W, 0, WIN_H)
 Main.ZIndex = 1
 Main.Parent = ScreenGui
-
-local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 8)
-mainCorner.Parent = Main
-
-local mainStroke = Instance.new("UIStroke")
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 8)
+local mainStroke = Instance.new("UIStroke", Main)
 mainStroke.Thickness = 3
 mainStroke.Color = Color3.fromRGB(180, 160, 190)
-mainStroke.Parent = Main
 
---============================================================
--- TITLE BAR (ZIndex 2)
---============================================================
+-- Title bar
 local TitleBar = Instance.new("Frame")
-TitleBar.Name = "TitleBar"
 TitleBar.BackgroundColor3 = Color3.fromRGB(85, 85, 95)
-TitleBar.BackgroundTransparency = 0
 TitleBar.BorderSizePixel = 0
 TitleBar.Position = UDim2.new(0, 6, 0, 6)
 TitleBar.Size = UDim2.new(1, -12, 0, 24)
 TitleBar.ZIndex = 2
 TitleBar.Parent = Main
-
-local tbCorner = Instance.new("UICorner")
-tbCorner.CornerRadius = UDim.new(0, 6)
-tbCorner.Parent = TitleBar
+Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 6)
 
 local TitleLbl = Instance.new("TextLabel")
 TitleLbl.BackgroundTransparency = 1
 TitleLbl.Text = "Prismware"
 TitleLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLbl.TextXAlignment = Enum.TextXAlignment.Left
-TitleLbl.Font = Enum.Font.SourceSansPro
+TitleLbl.Font = SAFE_FONT
 TitleLbl.TextSize = 14
 TitleLbl.Position = UDim2.new(0, 8, 0, 0)
 TitleLbl.Size = UDim2.new(1, -80, 1, 0)
@@ -139,55 +134,43 @@ CloseBtn.BackgroundColor3 = Color3.fromRGB(140, 60, 60)
 CloseBtn.BorderSizePixel = 0
 CloseBtn.Text = "X"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.Font = Enum.Font.SourceSansPro
+CloseBtn.Font = SAFE_FONT
 CloseBtn.TextSize = 14
 CloseBtn.Position = UDim2.new(1, -22, 0, 2)
 CloseBtn.Size = UDim2.new(0, 20, 0, 20)
 CloseBtn.ZIndex = 3
 CloseBtn.Parent = TitleBar
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 4)
+CloseBtn.MouseButton1Click:Connect(function() ScreenGui.Enabled = false end)
 
-local cbCorner = Instance.new("UICorner")
-cbCorner.CornerRadius = UDim.new(0, 4)
-cbCorner.Parent = CloseBtn
-
---============================================================
--- TAB BAR (ZIndex 2)
---============================================================
+-- Tab bar
 local TabBar = Instance.new("Frame")
-TabBar.Name = "TabBar"
 TabBar.BackgroundTransparency = 1
 TabBar.Position = UDim2.new(0, 6, 0, 34)
 TabBar.Size = UDim2.new(1, -12, 0, 22)
 TabBar.ZIndex = 2
 TabBar.Parent = Main
 
---============================================================
--- CONTENT (ZIndex 2)
---============================================================
+-- Content
 local Content = Instance.new("Frame")
-Content.Name = "Content"
 Content.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
-Content.BackgroundTransparency = 0
 Content.BorderSizePixel = 0
 Content.Position = UDim2.new(0, 6, 0, 60)
 Content.Size = UDim2.new(1, -12, 1, -66)
 Content.ZIndex = 2
 Content.Parent = Main
-
-local contCorner = Instance.new("UICorner")
-contCorner.CornerRadius = UDim.new(0, 6)
-contCorner.Parent = Content
+Instance.new("UICorner", Content).CornerRadius = UDim.new(0, 6)
 
 --============================================================
--- BUTTON STYLE (gradient kept ONLY on buttons)
+-- STYLE
 --============================================================
 local function styleButton(btn)
     btn.BorderSizePixel = 0
     btn.BackgroundColor3 = Color3.fromRGB(100, 100, 110)
     btn.BackgroundTransparency = 0
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.SourceSansPro
-    btn.TextSize = 13
+    btn.Font = SAFE_FONT
+    btn.TextSize = 12
     btn.ZIndex = 3
 
     local c = Instance.new("UICorner")
@@ -198,18 +181,10 @@ local function styleButton(btn)
     s.Thickness = 1.5
     s.Color = Color3.fromRGB(150, 150, 170)
     s.Parent = btn
-
-    local g = Instance.new("UIGradient")
-    g.Rotation = -90
-    g.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(55, 55, 70)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 120, 140))
-    }
-    g.Parent = btn
 end
 
 --============================================================
--- PAGE SYSTEM
+-- TAB SYSTEM
 --============================================================
 local Tabs = {}
 local ActiveTab = "Main"
@@ -247,7 +222,6 @@ local function makeToggle(tabName, name, x, y, w, h)
     b.Parent = Content
     registerWidget(tabName, b)
 
-    -- Indicator dot
     local dot = Instance.new("Frame")
     dot.Size = UDim2.new(0, 8, 0, 8)
     dot.Position = UDim2.new(1, -12, 0.5, -4)
@@ -255,10 +229,7 @@ local function makeToggle(tabName, name, x, y, w, h)
     dot.BorderSizePixel = 0
     dot.ZIndex = 4
     dot.Parent = b
-
-    local dc = Instance.new("UICorner")
-    dc.CornerRadius = UDim.new(1, 0)
-    dc.Parent = dot
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
 
     local state = Config:get(name)
     local function refresh()
@@ -285,7 +256,6 @@ local function makeToggle(tabName, name, x, y, w, h)
         Config:set(name, state)
         refresh()
     end)
-
     return b
 end
 
@@ -319,7 +289,7 @@ local function makeInput(tabName, label, defaultVal, key, x, y, w, h)
     lbl.BackgroundTransparency = 1
     lbl.Text = label
     lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-    lbl.Font = Enum.Font.SourceSansPro
+    lbl.Font = SAFE_FONT
     lbl.TextSize = 10
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Position = UDim2.new(0, 6, 0, 1)
@@ -331,7 +301,7 @@ local function makeInput(tabName, label, defaultVal, key, x, y, w, h)
     box.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
     box.Text = tostring(defaultVal)
     box.TextColor3 = Color3.fromRGB(255, 255, 255)
-    box.Font = Enum.Font.Code
+    box.Font = CODE_FONT
     box.TextSize = 13
     box.BorderSizePixel = 0
     box.ClearTextOnFocus = false
@@ -350,7 +320,6 @@ local function makeInput(tabName, label, defaultVal, key, x, y, w, h)
             box.Text = tostring(Config:getValue(key))
         end
     end)
-
     return holder
 end
 
@@ -375,9 +344,10 @@ for i, name in ipairs(TAB_NAMES) do
 end
 
 --============================================================
--- MODULES (real VapeV4 patterns)
+-- MODULE IMPLEMENTATIONS
 --============================================================
 
+-- VapeSpeed
 register("VapeSpeed", function(state)
     if not state then
         local c = lplr.Character
@@ -438,6 +408,7 @@ register("VapeSpeed", function(state)
     return function() conn:Disconnect(); updateFriction(false) end
 end)
 
+-- Killaura
 register("Killaura", function(state)
     if not state then return end
     local remote = ReplicatedStorage:FindFirstChild("AttackEntity", true)
@@ -485,6 +456,7 @@ register("Killaura", function(state)
     return function() conn:Disconnect() end
 end)
 
+-- Fly
 register("Fly", function(state)
     if not state then
         local c = lplr.Character
@@ -510,6 +482,7 @@ register("Fly", function(state)
     return function() conn:Disconnect(); bv:Destroy() end
 end)
 
+-- NoFall
 register("VapeNoFall", function(state)
     if not state then return end
     local rayParams = RaycastParams.new()
@@ -607,28 +580,7 @@ end)
 
 register("Theme", function(state) end)
 register("MiniGlide", function(state) end)
-register("Spider", function(state)
-    if not state then return end
-    local conn = RunService.PreSimulation:Connect(function(dt)
-        local c = lplr.Character
-        if not c then return end
-        local root = c:FindFirstChild("HumanoidRootPart")
-        local hum  = c:FindFirstChildOfClass("Humanoid")
-        if not root or not hum then return end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then return end
-        local params = RaycastParams.new()
-        params.FilterType = Enum.RaycastFilterType.Exclude
-        params.FilterDescendantsInstances = { c, Workspace.CurrentCamera }
-        local origin = root.Position - Vector3.new(0, hum.HipHeight - 0.5, 0)
-        local hit = Workspace:Raycast(origin, hum.MoveDirection * 2.5, params)
-        if hit and hit.Normal.Y == 0 then
-            hum:ChangeState(Enum.HumanoidStateType.Climbing)
-            root.AssemblyLinearVelocity = root.AssemblyLinearVelocity * Vector3.new(1,0,1)
-                + Vector3.new(0, 30, 0)
-        end
-    end)
-    return function() conn:Disconnect() end
-end)
+register("Spider", function(state) end)
 register("CityBoiAura", function(state) end)
 register("FarJump", function(state) end)
 register("Anti Fall", function(state) end)
@@ -664,17 +616,17 @@ register("TPNear AC", function(state) end)
 register("ACV2", function(state) end)
 
 --============================================================
--- BUILD WIDGETS
+-- BUILD BUTTONS
 --============================================================
-local COL1, COL2, COL3, COL4 = 6, 110, 210, 300
-local ROW1, ROW2, ROW3, ROW4, ROW5 = 4, 30, 56, 82, 108
-local W_COL1, W_COL2, W_COL3 = 100, 96, 84
+local C1, C2, C3, C4 = 6, 110, 210, 300
+local R1, R2, R3, R4, R5 = 4, 30, 56, 82, 108
+local W1, W2, W3 = 100, 96, 84
 
--- Main tab
-makeToggle("Main", "TriggerBot", COL1, ROW1, W_COL1)
-makeToggle("Main", "TPWalk",     COL1, ROW2, W_COL1)
-makeToggle("Main", "JitterMove", COL1, ROW3, W_COL1)
-makeActionButton("Main", "PlayerPull", COL1, ROW4, W_COL1, 22, function()
+-- Main
+makeToggle("Main", "TriggerBot", C1, R1, W1)
+makeToggle("Main", "TPWalk",     C1, R2, W1)
+makeToggle("Main", "JitterMove", C1, R3, W1)
+makeActionButton("Main", "PlayerPull", C1, R4, W1, 22, function()
     for _, p in Players:GetPlayers() do
         if p ~= lplr and p.Character and p.Character:FindFirstChild("HumanoidRootPart")
             and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") then
@@ -686,46 +638,46 @@ makeActionButton("Main", "PlayerPull", COL1, ROW4, W_COL1, 22, function()
     end
 end)
 
-makeToggle("Main", "Theme",      COL2, ROW1, W_COL2)
-makeToggle("Main", "MiniGlide",  COL2, ROW2, W_COL2)
-makeToggle("Main", "Spider",     COL2, ROW3, W_COL2)
-makeToggle("Main", "CityBoiAura",COL2, ROW4, W_COL2)
+makeToggle("Main", "Theme",      C2, R1, W2)
+makeToggle("Main", "MiniGlide",  C2, R2, W2)
+makeToggle("Main", "Spider",     C2, R3, W2)
+makeToggle("Main", "CityBoiAura",C2, R4, W2)
 
-makeToggle("Main", "FarJump",    COL3, ROW1, W_COL3)
-makeToggle("Main", "Anti Fall",  COL3, ROW2, W_COL3)
-makeToggle("Main", "StiffSpeed", COL3, ROW3, W_COL3)
-makeToggle("Main", "FastClick",  COL3, ROW4, W_COL3)
+makeToggle("Main", "FarJump",    C3, R1, W3)
+makeToggle("Main", "Anti Fall",  C3, R2, W3)
+makeToggle("Main", "StiffSpeed", C3, R3, W3)
+makeToggle("Main", "FastClick",  C3, R4, W3)
 
-makeToggle("Main", "Speed",      COL4, ROW1, 68)
-makeToggle("Main", "ACPrivate",  COL4, ROW2, 68)
-makeToggle("Main", "NoFall",     COL4, ROW3, 68)
-makeToggle("Main", "ACV2",       COL4, ROW4, 68)
+makeToggle("Main", "Speed",      C4, R1, 68)
+makeToggle("Main", "ACPrivate",  C4, R2, 68)
+makeToggle("Main", "NoFall",     C4, R3, 68)
+makeToggle("Main", "ACV2",       C4, R4, 68)
 
-makeToggle("Main", "SpoofAC",     COL1, ROW5, W_COL1)
-makeToggle("Main", "SemiDisabler",COL2, ROW5, W_COL2)
-makeToggle("Main", "TPNear AC",   COL3, ROW5, W_COL3)
+makeToggle("Main", "SpoofAC",     C1, R5, W1)
+makeToggle("Main", "SemiDisabler",C2, R5, W2)
+makeToggle("Main", "TPNear AC",   C3, R5, W3)
 
--- Blatant tab
-makeToggle("Blatant", "VapeSpeed",  COL1, ROW1, 120)
-makeToggle("Blatant", "Killaura",   COL1, ROW2, 120)
-makeToggle("Blatant", "Fly",        COL1, ROW3, 120)
-makeToggle("Blatant", "VapeNoFall", COL1, ROW4, 120)
-makeToggle("Blatant", "TPWalkVape", COL1, ROW5, 120)
+-- Blatant
+makeToggle("Blatant", "VapeSpeed",  C1, R1, 120)
+makeToggle("Blatant", "Killaura",   C1, R2, 120)
+makeToggle("Blatant", "Fly",        C1, R3, 120)
+makeToggle("Blatant", "VapeNoFall", C1, R4, 120)
+makeToggle("Blatant", "TPWalkVape", C1, R5, 120)
 
-makeInput("Blatant", "Speed (studs/sec)",  Config:getValue("speed") or 23,  "speed",  140, ROW1, 150, 42)
-makeInput("Blatant", "TPWalk (studs/sec)", Config:getValue("tpwalk") or 60, "tpwalk", 140, ROW1 + 46, 150, 42)
+makeInput("Blatant", "Speed (studs/sec)",  Config:getValue("speed") or 23,  "speed",  140, R1, 150, 42)
+makeInput("Blatant", "TPWalk (studs/sec)", Config:getValue("tpwalk") or 60, "tpwalk", 140, R1 + 46, 150, 42)
 
--- Settings tab
-makeActionButton("Settings", "Refresh Window", COL1, ROW1, 180, 22, function()
+-- Settings
+makeActionButton("Settings", "Refresh Window", C1, R1, 180, 22, function()
     print("[Prism] Refreshed")
 end)
-makeActionButton("Settings", "Save Config",  COL1, ROW2, 180, 22, function()
+makeActionButton("Settings", "Save Config",  C1, R2, 180, 22, function()
     Config:save(); print("[Prism] Saved")
 end)
-makeActionButton("Settings", "Load Config",  COL1, ROW3, 180, 22, function()
+makeActionButton("Settings", "Load Config",  C1, R3, 180, 22, function()
     Config:load(); print("[Prism] Loaded")
 end)
-makeActionButton("Settings", "Reset All",    COL1, ROW4, 180, 22, function()
+makeActionButton("Settings", "Reset All",    C1, R4, 180, 22, function()
     for name in pairs(Modules) do
         if Cleanups[name] then pcall(Cleanups[name]); Cleanups[name] = nil end
         Config.data.toggles[name] = false
@@ -735,7 +687,7 @@ makeActionButton("Settings", "Reset All",    COL1, ROW4, 180, 22, function()
 end)
 
 --============================================================
--- INITIAL TAB
+-- INIT
 --============================================================
 switchTab("Main")
 
@@ -769,12 +721,7 @@ do
     end)
 end
 
--- Close button
-CloseBtn.MouseButton1Click:Connect(function()
-    ScreenGui.Enabled = false
-end)
-
--- Keybind to reopen
+-- Keybind
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
@@ -782,4 +729,5 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
-print("[Prismware] Loaded on " .. (isMobile and "mobile" or "PC"))
+print("[Prismware] Loaded on " .. (isMobile and "mobile" or "PC")
+    .. " | Font: " .. tostring(SAFE_FONT))

@@ -1,19 +1,11 @@
---[[
-    PRISMWARE + VAPEV4 INTEGRATION
-    UI: Prismware style with tabs
-    Modules: Real VapeV4 code from 7GrandDadPGN/VapeV4ForRoblox
-    - Killaura (Blatant/Killaura.lua)
-    - NoClickDelay (Combat)
-    - Reach (Combat)
-    - ShopTierBypass (Utility)
-    - BedESP (Render)
-]]
+-- Prismware + VapeV4 (v8)
+-- Fixes: Fullbright toggle, NoClickDelay+AutoClick, Killaura guarded, AntiFall added, Fly removed
+-- New tab: Prism (all original Prismware features)
 
 local Players = game:GetService("Players")
 local lplr = Players.LocalPlayer
 local PlayerGui = lplr:WaitForChild("PlayerGui")
 
--- Destroy old GUI
 local old = PlayerGui:FindFirstChild("Prismware")
 if old then old:Destroy() end
 
@@ -24,19 +16,17 @@ local HttpService       = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace         = game:GetService("Workspace")
 local CollectionService = game:GetService("CollectionService")
+local Lighting          = game:GetService("Lighting")
 local Camera = Workspace.CurrentCamera
 
---============================================================
--- PLATFORM
---============================================================
 local isMobile = (UserInputService.TouchEnabled == true)
     and (UserInputService.MouseEnabled ~= true)
 
 --============================================================
--- SAFE FONT PICKER
+-- SAFE FONT
 --============================================================
 local function pickFont()
-    local names = {"SourceSans", "Gotham", "Roboto", "Arial", "Code"}
+    local names = {"SourceSans", "Gotham", "Roboto", "Arial"}
     for _, n in ipairs(names) do
         local ok, f = pcall(function() return Enum.Font[n] end)
         if ok and f then return f end
@@ -50,15 +40,15 @@ local CODE_FONT = (function()
     return SAFE_FONT
 end)()
 
-local WIN_W = isMobile and 340 or 460
-local WIN_H = isMobile and 240 or 280
+local WIN_W = isMobile and 350 or 470
+local WIN_H = isMobile and 250 or 290
 
 --============================================================
 -- CONFIG
 --============================================================
 local Config = {
     path = "PrismCfg.json",
-    data = { toggles = {}, values = { speed = 23, tpwalk = 60, reach = 18 } },
+    data = { toggles = {}, values = { speed = 23, tpwalk = 60, reach = 18, cps = 15 } },
 }
 function Config:save()
     pcall(function()
@@ -84,31 +74,14 @@ function Config:setValue(k, v) self.data.values[k] = v; self:save() end
 Config:load()
 
 --============================================================
--- BEDWARS LIBRARY ACCESS
+-- BEDWARS BRIDGE
 --============================================================
-local bedwars = _G.bedwars
-if not bedwars then
-    -- Try to find Knit
-    local Knit = _G.Knit
-    if not Knit then
-        local ok, k = pcall(function()
-            return debug.getupvalue(getsenv().require, 0)
-        end)
-        if ok then Knit = k end
-    end
-    bedwars = {
-        CombatConstant = _G.CombatConstant or { RAYCAST_SWORD_CHARACTER_DISTANCE = 14.4 },
-        SwordController = _G.SwordController or {},
-        Shop = _G.Shop or { ShopItems = {} },
-        Client = _G.Client or { Get = function() return { instance = { FireServer = function() end } } end },
-        ItemMeta = _G.ItemMeta or {},
-        SwordController = _G.SwordController or {},
-        ScytheController = _G.ScytheController or {},
-        ViewmodelController = _G.ViewmodelController or {},
-    }
-end
+local bedwars = _G.bedwars or {
+    CombatConstant = _G.CombatConstant or { RAYCAST_SWORD_CHARACTER_DISTANCE = 14.4 },
+    SwordController = _G.SwordController or {},
+    Shop = _G.Shop or { ShopItems = {} },
+}
 
--- Fallback remote finder
 local function findRemote(name)
     local r = ReplicatedStorage:FindFirstChild(name, true)
     if r then return r end
@@ -119,8 +92,6 @@ local function findRemote(name)
     end
     return nil
 end
-
-local AttackRemote = findRemote("AttackEntity") or findRemote("SwordRemote")
 
 --============================================================
 -- MODULE REGISTRY
@@ -149,7 +120,6 @@ ScreenGui.Parent = PlayerGui
 local Main = Instance.new("Frame")
 Main.Name = "Main"
 Main.BackgroundColor3 = Color3.fromRGB(60, 60, 68)
-Main.BackgroundTransparency = 0
 Main.BorderSizePixel = 0
 Main.Position = UDim2.new(0, 30, 0, 100)
 Main.Size = UDim2.new(0, WIN_W, 0, WIN_H)
@@ -160,7 +130,7 @@ local mainStroke = Instance.new("UIStroke", Main)
 mainStroke.Thickness = 3
 mainStroke.Color = Color3.fromRGB(180, 160, 190)
 
--- Title bar
+-- Title
 local TitleBar = Instance.new("Frame")
 TitleBar.BackgroundColor3 = Color3.fromRGB(85, 85, 95)
 TitleBar.BorderSizePixel = 0
@@ -196,7 +166,7 @@ CloseBtn.Parent = TitleBar
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 4)
 CloseBtn.MouseButton1Click:Connect(function() ScreenGui.Enabled = false end)
 
--- Tab bar
+-- Tabs
 local TabBar = Instance.new("Frame")
 TabBar.BackgroundTransparency = 1
 TabBar.Position = UDim2.new(0, 6, 0, 34)
@@ -220,20 +190,14 @@ Instance.new("UICorner", Content).CornerRadius = UDim.new(0, 6)
 local function styleButton(btn)
     btn.BorderSizePixel = 0
     btn.BackgroundColor3 = Color3.fromRGB(100, 100, 110)
-    btn.BackgroundTransparency = 0
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = SAFE_FONT
     btn.TextSize = 12
     btn.ZIndex = 3
-
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 4)
-    c.Parent = btn
-
-    local s = Instance.new("UIStroke")
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    local s = Instance.new("UIStroke", btn)
     s.Thickness = 1.5
     s.Color = Color3.fromRGB(150, 150, 170)
-    s.Parent = btn
 end
 
 --============================================================
@@ -251,9 +215,8 @@ end
 local function switchTab(name)
     ActiveTab = name
     for tname, tab in pairs(Tabs) do
-        local visible = (tname == name)
         for _, w in ipairs(tab.widgets) do
-            w.Visible = visible
+            w.Visible = (tname == name)
         end
         if tab.tabBtn then
             tab.tabBtn.BackgroundColor3 = (tname == name)
@@ -368,6 +331,11 @@ local function makeInput(tabName, label, defaultVal, key, x, y, w, h)
         local num = tonumber(box.Text)
         if num then
             Config:setValue(key, num)
+            if key == "reach" and Config:get("Reach") then
+                if bedwars.CombatConstant then
+                    bedwars.CombatConstant.RAYCAST_SWORD_CHARACTER_DISTANCE = num + 2
+                end
+            end
             print("[Prism] " .. label .. " = " .. tostring(num))
         else
             box.Text = tostring(Config:getValue(key))
@@ -377,11 +345,11 @@ local function makeInput(tabName, label, defaultVal, key, x, y, w, h)
 end
 
 --============================================================
--- TAB BUTTONS
+-- TABS
 --============================================================
-local TAB_NAMES = { "Combat", "Blatant", "Utility", "Render", "Settings" }
-local TAB_W = isMobile and 60 or 80
-local TAB_GAP = 3
+local TAB_NAMES = { "Combat", "Blatant", "Utility", "Render", "Prism", "Settings" }
+local TAB_W = isMobile and 54 or 70
+local TAB_GAP = 2
 
 for i, name in ipairs(TAB_NAMES) do
     Tabs[name] = Tabs[name] or { widgets = {} }
@@ -397,17 +365,16 @@ for i, name in ipairs(TAB_NAMES) do
 end
 
 --============================================================
--- VAPEV4 MODULES
+-- COMBAT MODULES
 --============================================================
 
---============================================================
--- KILLAURA — from VapeV4 Blatant/Killaura.lua
---============================================================
+-- KILLAURA (from VapeV4 Blatant/Killaura.lua, guarded)
 register("Killaura", function(state)
     if not state then return end
-
     local AttackRemote = findRemote("AttackEntity") or findRemote("SwordRemote")
-    if not AttackRemote then warn("Killaura: AttackEntity remote not found") return end
+    if not AttackRemote then
+        warn("Killaura: AttackEntity remote not found. Module will idle.")
+    end
 
     local Boxes = {}
     for i = 1, 10 do
@@ -425,10 +392,13 @@ register("Killaura", function(state)
         local char = lplr.Character
         if not char or not char.PrimaryPart then return end
         local tool = char:FindFirstChildWhichIsA("Tool")
-        if not tool then return end
+        if not tool then
+            for _, box in ipairs(Boxes) do box.Adornee = nil; box.Transparency = 1 end
+            return
+        end
 
         local selfpos = char.PrimaryPart.Position
-        local localfacing = char.PrimaryPart.CFrame.LookVector * Vector3.new(1, 0, 1)
+        local facing = char.PrimaryPart.CFrame.LookVector * Vector3.new(1, 0, 1)
 
         local attacked = {}
         for _, p in ipairs(Players:GetPlayers()) do
@@ -440,18 +410,17 @@ register("Killaura", function(state)
             local dist = delta.Magnitude
             if dist > 28 then continue end
 
-            local angle = math.acos(math.clamp(localfacing:Dot((delta * Vector3.new(1,0,1)).Unit), -1, 1))
-            if angle > math.rad(180) then continue end
+            local ang = math.acos(math.clamp(facing:Dot((delta * Vector3.new(1,0,1)).Unit), -1, 1))
+            if ang > math.rad(180) then continue end
 
             table.insert(attacked, {
                 Entity = { RootPart = p.Character.PrimaryPart, Character = p.Character },
                 Check = dist > 14.4 and {Hue=0.6,Sat=0.8,Value=1,Opacity=0.5} or {Hue=0,Sat=0.8,Value=1,Opacity=0.6}
             })
 
-            if dist <= 14.4 then
+            if dist <= 14.4 and AttackRemote then
                 local dir = CFrame.lookAt(selfpos, p.Character.PrimaryPart.Position).LookVector
                 local pos = selfpos + dir * math.max(dist - 14.399, 0)
-
                 pcall(function()
                     AttackRemote:FireServer({
                         weapon = tool,
@@ -470,7 +439,6 @@ register("Killaura", function(state)
             end
         end
 
-        -- Update boxes
         for i, box in ipairs(Boxes) do
             local data = attacked[i]
             if data then
@@ -483,7 +451,6 @@ register("Killaura", function(state)
             end
         end
 
-        -- Face target
         if attacked[1] then
             local vec = attacked[1].Entity.RootPart.Position * Vector3.new(1, 0, 1)
             char.PrimaryPart.CFrame = CFrame.lookAt(
@@ -495,12 +462,14 @@ register("Killaura", function(state)
 
     return function()
         conn:Disconnect()
-        for _, box in ipairs(Boxes) do box:Destroy() end
+        for _, box in ipairs(Boxes) do
+            pcall(function() box:Destroy() end)
+        end
     end
 end)
 
 --============================================================
--- NOCLICKDELAY — from VapeV4 Combat
+-- NOCLICKDELAY + AUTOCLICK (VapeV4 Combat)
 --============================================================
 local oldClickCheck = nil
 
@@ -515,38 +484,53 @@ register("NoClickDelay", function(state)
             end
             print("[NoClickDelay] Hooked SwordController")
         else
-            -- Try to find it
-            local bedwarsRS = ReplicatedStorage:FindFirstChild("Bedwars")
-            if bedwarsRS then
-                local modules = bedwarsRS:FindFirstChild("Modules")
-                if modules then
-                    local sc2 = modules:FindFirstChild("SwordController")
+            local bRS = ReplicatedStorage:FindFirstChild("Bedwars")
+            if bRS then
+                local mods = bRS:FindFirstChild("Modules")
+                if mods then
+                    local sc2 = mods:FindFirstChild("SwordController")
                     if sc2 and sc2:IsA("ModuleScript") then
-                        local ok, mod = pcall(require, sc2)
-                        if ok and mod and mod.isClickingTooFast then
-                            oldClickCheck = mod.isClickingTooFast
-                            mod.isClickingTooFast = function(self)
+                        local ok, m = pcall(require, sc2)
+                        if ok and m and m.isClickingTooFast then
+                            oldClickCheck = m.isClickingTooFast
+                            m.isClickingTooFast = function(self)
                                 self.lastSwing = os.clock()
                                 return false
                             end
-                            bedwars.SwordController = mod
+                            bedwars.SwordController = m
                             print("[NoClickDelay] Hooked via ModuleScript")
                         end
                     end
                 end
             end
         end
-    else
-        if bedwars.SwordController and oldClickCheck then
-            bedwars.SwordController.isClickingTooFast = oldClickCheck
-            oldClickCheck = nil
-            print("[NoClickDelay] Restored")
+
+        -- Built-in autoclick
+        local last = 0
+        local acConn = RunService.Heartbeat:Connect(function()
+            local cps = Config:getValue("cps") or 15
+            local interval = 1 / cps
+            if tick() - last < interval then return end
+            local char = lplr.Character
+            if not char then return end
+            local tool = char:FindFirstChildWhichIsA("Tool")
+            if not tool then return end
+            pcall(function() mouse1click() end)
+            last = tick()
+        end)
+
+        return function()
+            acConn:Disconnect()
+            if bedwars.SwordController and oldClickCheck then
+                bedwars.SwordController.isClickingTooFast = oldClickCheck
+                oldClickCheck = nil
+            end
         end
     end
 end)
 
 --============================================================
--- REACH — from VapeV4 Combat
+-- REACH (VapeV4 Combat)
 --============================================================
 register("Reach", function(state)
     if state then
@@ -554,11 +538,9 @@ register("Reach", function(state)
         if bedwars.CombatConstant then
             bedwars.CombatConstant.RAYCAST_SWORD_CHARACTER_DISTANCE = range + 2
         end
-        -- Also try direct global
         if _G.CombatConstant then
             _G.CombatConstant.RAYCAST_SWORD_CHARACTER_DISTANCE = range + 2
         end
-        print("[Reach] Set to " .. (range + 2) .. " studs")
     else
         if bedwars.CombatConstant then
             bedwars.CombatConstant.RAYCAST_SWORD_CHARACTER_DISTANCE = 14.4
@@ -566,36 +548,76 @@ register("Reach", function(state)
         if _G.CombatConstant then
             _G.CombatConstant.RAYCAST_SWORD_CHARACTER_DISTANCE = 14.4
         end
-        print("[Reach] Restored to 14.4")
     end
 end)
 
--- Reach value updater
-local reachUpdater = function(val)
-    if Config:get("Reach") then
-        if bedwars.CombatConstant then
-            bedwars.CombatConstant.RAYCAST_SWORD_CHARACTER_DISTANCE = val + 2
-        end
-        if _G.CombatConstant then
-            _G.CombatConstant.RAYCAST_SWORD_CHARACTER_DISTANCE = val + 2
-        end
+--============================================================
+-- ANTIFALL (invisible platform under you)
+--============================================================
+register("AntiFall", function(state)
+    if not state then return end
+    local rayParams = RaycastParams.new()
+    if Enum.RaycastFilterType.Exclude then
+        rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    else
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
     end
-end
+    rayParams.FilterDescendantsInstances = { lplr.Character }
+
+    local platform = nil
+    local lastSafeY = 0
+
+    local conn = RunService.Heartbeat:Connect(function()
+        local char = lplr.Character
+        if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        -- Update safe Y from raycast down
+        rayParams.FilterDescendantsInstances = { char }
+        local hit = Workspace:Raycast(root.Position + Vector3.new(0, 3, 0),
+            Vector3.new(0, -200, 0), rayParams)
+        if hit and hit.Instance.CanCollide then
+            lastSafeY = hit.Position.Y + 4
+        end
+
+        -- Falling fast? Create platform
+        if root.AssemblyLinearVelocity.Y < -40 then
+            if not platform then
+                platform = Instance.new("Part")
+                platform.Size = Vector3.new(14, 1.5, 14)
+                platform.Anchored = true
+                platform.CanCollide = true
+                platform.Transparency = 1
+                platform.CanQuery = false
+                platform.Parent = Workspace
+            end
+            platform.Position = Vector3.new(root.Position.X, lastSafeY - 1, root.Position.Z)
+            -- Fake grounded state
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                pcall(function()
+                    hum:ChangeState(Enum.HumanoidStateType.Landed)
+                end)
+            end
+        elseif platform then
+            platform:Destroy()
+            platform = nil
+        end
+    end)
+
+    return function()
+        conn:Disconnect()
+        if platform then platform:Destroy() end
+    end
+end)
 
 --============================================================
--- SHOPTIERBYPASS — from VapeV4 Utility
+-- UTILITY
 --============================================================
 register("ShopTierBypass", function(state)
     if state then
         local shop = bedwars.Shop
-        if not shop or not shop.ShopItems then
-            -- Try to find it
-            local bedwarsRS = ReplicatedStorage:FindFirstChild("Bedwars")
-            if bedwarsRS then
-                shop = { ShopItems = {} }
-            end
-        end
-
         if shop and shop.ShopItems then
             local tiered, nexttier = {}, {}
             for _, v in ipairs(shop.ShopItems) do
@@ -606,25 +628,34 @@ register("ShopTierBypass", function(state)
             end
             _G._shopTiered = tiered
             _G._shopNextTier = nexttier
-            print("[ShopTierBypass] Disabled tier restrictions")
         end
     else
         if _G._shopTiered then
-            for i, v in pairs(_G._shopTiered) do
-                i.tiered = v
-            end
-            for i, v in pairs(_G._shopNextTier) do
-                i.nextTier = v
-            end
+            for i, v in pairs(_G._shopTiered) do i.tiered = v end
+            for i, v in pairs(_G._shopNextTier) do i.nextTier = v end
             _G._shopTiered = nil
             _G._shopNextTier = nil
-            print("[ShopTierBypass] Restored tier restrictions")
         end
     end
 end)
 
+register("TPWalk", function(state)
+    if not state then return end
+    local conn = RunService.Heartbeat:Connect(function(dt)
+        local c = lplr.Character
+        if not c then return end
+        local root = c:FindFirstChild("HumanoidRootPart")
+        local hum  = c:FindFirstChildOfClass("Humanoid")
+        if root and hum and hum.MoveDirection.Magnitude > 0 then
+            local sp = Config:getValue("tpwalk") or 60
+            root.CFrame = root.CFrame + hum.MoveDirection * sp * dt
+        end
+    end)
+    return function() conn:Disconnect() end
+end)
+
 --============================================================
--- BEDESP — from VapeV4 Render
+-- RENDER
 --============================================================
 register("BedESP", function(state)
     local Reference = {}
@@ -685,14 +716,142 @@ register("BedESP", function(state)
 end)
 
 --============================================================
--- FALLBACK MODULES (Prismware originals)
+-- FULLBRIGHT — FIXED (captures originals once)
 --============================================================
+local fullbrightOriginals = nil
+
+register("Fullbright", function(state)
+    if state then
+        -- Capture originals ONCE on first enable
+        if not fullbrightOriginals then
+            fullbrightOriginals = {
+                Ambient = Lighting.Ambient,
+                Brightness = Lighting.Brightness,
+                OutdoorAmbient = Lighting.OutdoorAmbient,
+                ClockTime = Lighting.ClockTime,
+            }
+        end
+        Lighting.Ambient = Color3.fromRGB(180, 180, 180)
+        Lighting.Brightness = 3
+        Lighting.OutdoorAmbient = Color3.fromRGB(180, 180, 180)
+        Lighting.ClockTime = 14
+    else
+        -- Restore only if we have stored originals
+        if fullbrightOriginals then
+            Lighting.Ambient = fullbrightOriginals.Ambient
+            Lighting.Brightness = fullbrightOriginals.Brightness
+            Lighting.OutdoorAmbient = fullbrightOriginals.OutdoorAmbient
+            Lighting.ClockTime = fullbrightOriginals.ClockTime
+        end
+    end
+end)
+
+--============================================================
+-- PRISM TAB — ALL ORIGINAL PRISMWARE FEATURES
+--============================================================
+
+-- Speed (basic walkspeed)
 register("Speed", function(state)
+    local c = lplr.Character
+    if not c then return end
+    local h = c:FindFirstChildOfClass("Humanoid")
+    if not h then return end
+    if state then
+        h.WalkSpeed = Config:getValue("speed") or 23
+    else
+        h.WalkSpeed = 16
+    end
+end)
+
+-- TriggerBot
+register("TriggerBot", function(state)
+    if not state then return end
+    local mouse = lplr:GetMouse()
+    local last = 0
+    local conn = RunService.Heartbeat:Connect(function()
+        if tick() - last < 0.08 then return end
+        if not mouse.Target then return end
+        local m = mouse.Target:FindFirstAncestorWhichIsA("Model")
+        if not m then return end
+        local h = m:FindFirstChildOfClass("Humanoid")
+        if not h or h.Health <= 0 then return end
+        local p = Players:GetPlayerFromCharacter(m)
+        if not p or p == lplr then return end
+        local mr = lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart")
+        local tr = m:FindFirstChild("HumanoidRootPart")
+        if mr and tr and (mr.Position - tr.Position).Magnitude <= 20 then
+            mouse1click(); last = tick()
+        end
+    end)
+    return function() conn:Disconnect() end
+end)
+
+-- JitterMove
+register("JitterMove", function(state)
+    if not state then return end
+    local conn = RunService.Heartbeat:Connect(function()
+        local c = lplr.Character
+        if not c then return end
+        local root = c:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = root.CFrame
+                + Vector3.new(math.random(-10,10)/100, 0, math.random(-10,10)/100)
+        end
+    end)
+    return function() conn:Disconnect() end
+end)
+
+-- MiniGlide
+register("MiniGlide", function(state)
+    if not state then return end
+    local conn = RunService.Heartbeat:Connect(function()
+        local c = lplr.Character
+        if not c then return end
+        local hum = c:FindFirstChildOfClass("Humanoid")
+        local root = c:FindFirstChild("HumanoidRootPart")
+        if hum and root and hum.FloorMaterial == Enum.Material.Air then
+            local v = root.AssemblyLinearVelocity
+            root.AssemblyLinearVelocity = Vector3.new(v.X, math.max(v.Y, -2), v.Z)
+        end
+    end)
+    return function() conn:Disconnect() end
+end)
+
+-- Spider
+register("Spider", function(state)
+    if not state then return end
+    local conn = RunService.PreSimulation:Connect(function(dt)
+        local c = lplr.Character
+        if not c then return end
+        local root = c:FindFirstChild("HumanoidRootPart")
+        local hum  = c:FindFirstChildOfClass("Humanoid")
+        if not root or not hum then return end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then return end
+        local params = RaycastParams.new()
+        if Enum.RaycastFilterType.Exclude then
+            params.FilterType = Enum.RaycastFilterType.Exclude
+        else
+            params.FilterType = Enum.RaycastFilterType.Blacklist
+        end
+        params.FilterDescendantsInstances = { c, Camera }
+        local origin = root.Position - Vector3.new(0, hum.HipHeight - 0.5, 0)
+        local hit = Workspace:Raycast(origin, hum.MoveDirection * 2.5, params)
+        if hit and hit.Normal.Y == 0 then
+            hum:ChangeState(Enum.HumanoidStateType.Climbing)
+            root.AssemblyLinearVelocity = root.AssemblyLinearVelocity * Vector3.new(1,0,1)
+                + Vector3.new(0, 30, 0)
+        end
+    end)
+    return function() conn:Disconnect() end
+end)
+
+-- StiffSpeed
+register("StiffSpeed", function(state)
     if not state then
         local c = lplr.Character
         if c then
             local h = c:FindFirstChildOfClass("Humanoid")
-            if h then h.WalkSpeed = 16 end
+            if h then h.PlatformStand = false; h.AutoRotate = true end
         end
         return
     end
@@ -702,84 +861,44 @@ register("Speed", function(state)
         local root = c:FindFirstChild("HumanoidRootPart")
         local hum  = c:FindFirstChildOfClass("Humanoid")
         if not root or not hum then return end
-        local sp = Config:getValue("speed") or 23
-        local moveDir = hum.MoveDirection
-        if moveDir.Magnitude > 0 then
-            local velo = (root.AssemblyLinearVelocity * Vector3.new(1,0,1)).Magnitude
-            local target = sp
-            local dest = moveDir * math.max(target - velo, 0) * dt
-            root.CFrame = root.CFrame + dest
-            root.AssemblyLinearVelocity = (moveDir * velo) + Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
-            if hum:GetState() == Enum.HumanoidStateType.Running
-                or hum:GetState() == Enum.HumanoidStateType.Landed then
-                hum:ChangeState(Enum.HumanoidStateType.Jumping)
-            end
+        hum.PlatformStand = true
+        hum.AutoRotate = false
+        local move = Vector3.new()
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += root.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= root.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= root.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += root.CFrame.RightVector end
+        if move.Magnitude > 0 then
+            root.CFrame = root.CFrame + move.Unit * 150 * dt
         end
     end)
-    return function() conn:Disconnect() end
-end)
-
-register("TPWalk", function(state)
-    if not state then return end
-    local conn = RunService.Heartbeat:Connect(function(dt)
+    return function()
+        conn:Disconnect()
         local c = lplr.Character
-        if not c then return end
-        local root = c:FindFirstChild("HumanoidRootPart")
-        local hum  = c:FindFirstChildOfClass("Humanoid")
-        if root and hum and hum.MoveDirection.Magnitude > 0 then
-            local sp = Config:getValue("tpwalk") or 60
-            root.CFrame = root.CFrame + hum.MoveDirection * sp * dt
+        if c then
+            local h = c:FindFirstChildOfClass("Humanoid")
+            if h then h.PlatformStand = false; h.AutoRotate = true end
         end
-    end)
-    return function() conn:Disconnect() end
-end)
-
-register("Fly", function(state)
-    if not state then
-        local c = lplr.Character
-        if c and c.PrimaryPart then
-            local bv = c.PrimaryPart:FindFirstChild("PrismFly")
-            if bv then bv:Destroy() end
-        end
-        return
     end
-    local c = lplr.Character
-    if not c or not c.PrimaryPart then return end
-    local bv = Instance.new("BodyVelocity")
-    bv.Name = "PrismFly"
-    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    bv.Velocity = Vector3.zero
-    bv.Parent = c.PrimaryPart
-    local conn = RunService.PreSimulation:Connect(function()
-        local ch = lplr.Character
-        if not ch or not ch.PrimaryPart or not bv.Parent then return end
-        bv.Velocity = Camera.CFrame.LookVector * 50
-    end)
-    return function() conn:Disconnect(); bv:Destroy() end
 end)
 
-register("InfiniteJump", function(state)
+-- FarJump
+register("FarJump", function(state)
     if not state then return end
     local conn = UserInputService.JumpRequest:Connect(function()
         local c = lplr.Character
-        local h = c and c:FindFirstChildOfClass("Humanoid")
-        if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+        if not c then return end
+        local root = c:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.AssemblyLinearVelocity = root.AssemblyLinearVelocity
+                + root.CFrame.LookVector * 80 + Vector3.new(0, 60, 0)
+        end
     end)
     return function() conn:Disconnect() end
 end)
 
-register("Fullbright", function(state)
-    local oa, ob = game:GetService("Lighting").Ambient, game:GetService("Lighting").Brightness
-    if state then
-        game:GetService("Lighting").Ambient = Color3.fromRGB(180,180,180)
-        game:GetService("Lighting").Brightness = 3
-    else
-        game:GetService("Lighting").Ambient = oa
-        game:GetService("Lighting").Brightness = ob
-    end
-end)
-
-register("AntiFall", function(state)
+-- NoFall
+register("NoFall", function(state)
     if not state then return end
     local conn = RunService.Heartbeat:Connect(function()
         local c = lplr.Character
@@ -792,44 +911,99 @@ register("AntiFall", function(state)
     return function() conn:Disconnect() end
 end)
 
+-- InfiniteJump
+register("InfiniteJump", function(state)
+    if not state then return end
+    local conn = UserInputService.JumpRequest:Connect(function()
+        local c = lplr.Character
+        local h = c and c:FindFirstChildOfClass("Humanoid")
+        if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end)
+    return function() conn:Disconnect() end
+end)
+
+-- FastClick (basic autoclick)
+register("FastClick", function(state)
+    if not state then return end
+    task.spawn(function()
+        while Config:get("FastClick") do
+            pcall(function() mouse1click() end)
+            task.wait(1 / (Config:getValue("cps") or 15))
+        end
+    end)
+end)
+
+-- Stub modules (no safe universal implementation)
+register("PlayerPull", function(state) end)
+register("Theme", function(state)
+    if state then
+        Lighting.Ambient = Color3.fromRGB(140, 60, 80)
+    else
+        Lighting.Ambient = fullbrightOriginals and fullbrightOriginals.Ambient or Color3.fromRGB(70, 70, 70)
+    end
+end)
+register("CityBoiAura", function(state) end)
+register("ACPrivate", function(state) end)
+register("SpoofAC", function(state) end)
+register("SemiDisabler", function(state) end)
+register("TPNear AC", function(state) end)
+register("ACV2", function(state) end)
+
 --============================================================
 -- BUILD TABS
 --============================================================
 local C1, C2, C3 = 6, 110, 214
 local R1, R2, R3, R4, R5 = 4, 30, 56, 82, 108
 
--- COMBAT TAB
-makeToggle("Combat", "Killaura",      C1, R1, 100)
-makeToggle("Combat", "NoClickDelay",  C1, R2, 100)
-makeToggle("Combat", "Reach",         C1, R3, 100)
+-- COMBAT
+makeToggle("Combat", "Killaura",     C1, R1, 100)
+makeToggle("Combat", "NoClickDelay", C1, R2, 100)
+makeToggle("Combat", "Reach",        C1, R3, 100)
+makeInput ("Combat", "Reach (studs)", Config:getValue("reach") or 18, "reach", C2, R1, 140, 42)
+makeInput ("Combat", "CPS",           Config:getValue("cps") or 15,   "cps",   C2, R1 + 46, 140, 42)
 
-makeInput("Combat", "Reach (studs)", Config:getValue("reach") or 18, "reach", C2, R1, 140, 42)
+-- BLATANT
+makeToggle("Blatant", "Speed",        C1, R1, 100)
+makeToggle("Blatant", "AntiFall",     C1, R2, 100)
+makeToggle("Blatant", "InfiniteJump", C1, R3, 100)
+makeInput ("Blatant", "Speed (studs)", Config:getValue("speed") or 23, "speed", C2, R1, 140, 42)
 
--- BLATANT TAB
-makeToggle("Blatant", "Speed",       C1, R1, 100)
-makeToggle("Blatant", "Fly",         C1, R2, 100)
-makeToggle("Blatant", "InfiniteJump",C1, R3, 100)
-makeToggle("Blatant", "AntiFall",    C1, R4, 100)
-
-makeInput("Blatant", "Speed (studs)", Config:getValue("speed") or 23, "speed", C2, R1, 140, 42)
-makeInput("Blatant", "TPWalk (studs)", Config:getValue("tpwalk") or 60, "tpwalk", C2, R1 + 46, 140, 42)
-
--- UTILITY TAB
+-- UTILITY
 makeToggle("Utility", "TPWalk",         C1, R1, 100)
 makeToggle("Utility", "ShopTierBypass", C1, R2, 100)
+makeInput ("Utility", "TPWalk (studs)", Config:getValue("tpwalk") or 60, "tpwalk", C2, R1, 140, 42)
 
--- RENDER TAB
+-- RENDER
 makeToggle("Render", "BedESP",     C1, R1, 100)
 makeToggle("Render", "Fullbright", C1, R2, 100)
 
--- SETTINGS TAB
-makeActionButton("Settings", "Save Config",   C1, R1, 180, 22, function()
+-- PRISM (all original Prismware features)
+makeToggle("Prism", "TriggerBot",  C1, R1, 100)
+makeToggle("Prism", "JitterMove",  C1, R2, 100)
+makeToggle("Prism", "MiniGlide",   C1, R3, 100)
+makeToggle("Prism", "Spider",      C1, R4, 100)
+makeToggle("Prism", "StiffSpeed",  C1, R5, 100)
+
+makeToggle("Prism", "FarJump",     C2, R1, 100)
+makeToggle("Prism", "NoFall",      C2, R2, 100)
+makeToggle("Prism", "FastClick",   C2, R3, 100)
+makeToggle("Prism", "Theme",       C2, R4, 100)
+makeToggle("Prism", "PlayerPull",  C2, R5, 100)
+
+makeToggle("Prism", "CityBoiAura", C3, R1, 100)
+makeToggle("Prism", "ACPrivate",   C3, R2, 100)
+makeToggle("Prism", "SpoofAC",     C3, R3, 100)
+makeToggle("Prism", "SemiDisabler",C3, R4, 100)
+makeToggle("Prism", "TPNear AC",   C3, R5, 100)
+
+-- SETTINGS
+makeActionButton("Settings", "Save Config", C1, R1, 180, 22, function()
     Config:save(); print("[Prism] Saved")
 end)
-makeActionButton("Settings", "Load Config",   C1, R2, 180, 22, function()
+makeActionButton("Settings", "Load Config", C1, R2, 180, 22, function()
     Config:load(); print("[Prism] Loaded")
 end)
-makeActionButton("Settings", "Reset All",     C1, R3, 180, 22, function()
+makeActionButton("Settings", "Reset All", C1, R3, 180, 22, function()
     for name in pairs(Modules) do
         if Cleanups[name] then pcall(Cleanups[name]); Cleanups[name] = nil end
         Config.data.toggles[name] = false
@@ -837,15 +1011,6 @@ makeActionButton("Settings", "Reset All",     C1, R3, 180, 22, function()
     Config:save()
     print("[Prism] Reset all")
 end)
-
---============================================================
--- REACH VALUE UPDATER
---============================================================
--- Hook the reach input to the updater
-local function onReachChanged(val)
-    Config:setValue("reach", val)
-    reachUpdater(val)
-end
 
 --============================================================
 -- INIT
@@ -891,5 +1056,4 @@ UserInputService.InputBegan:Connect(function(input, gp)
 end)
 
 print("[Prismware] Loaded on " .. (isMobile and "mobile" or "PC"))
-print("[Prismware] Tabs: Combat | Blatant | Utility | Render | Settings")
-print("[Prismware] VapeV4 modules: Killaura, NoClickDelay, Reach, ShopTierBypass, BedESP")
+print("[Prismware] Tabs: Combat | Blatant | Utility | Render | Prism | Settings")

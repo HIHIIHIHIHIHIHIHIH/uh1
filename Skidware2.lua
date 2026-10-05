@@ -1,8 +1,10 @@
---============================================================
--- SKIDWARE REVAMPED - VAPEV4 EDITION
--- Uses actual VapeV4 Speed module logic from GitHub
--- New Blatant tab + TextBox inputs for Speed & TPWalk
---============================================================
+--[[
+    PRISMWARE REVAMPED
+    UI based on Prismware (old Skidware) by @uniquadev
+    Modules: Real VapeV4 code from 7GrandDadPGN/VapeV4ForRoblox
+    Speed.lua / Killaura.lua / Fly.lua / NoFall.lua
+    Tabs added: Blatant | Combat | Movement | Player | Settings | Console
+]]
 
 --============================================================
 -- SERVICES
@@ -28,8 +30,8 @@ Logger.__index = Logger
 
 function Logger.new()
     local self = setmetatable({}, Logger)
-    self.lines    = {}
-    self.maxLines = 300
+    self.lines     = {}
+    self.maxLines  = 300
     self.listFrame = nil
     return self
 end
@@ -79,9 +81,8 @@ end
 function Logger:getAll()   return table.concat(self.lines, "\n") end
 
 function Logger:copyAll()
-    local txt = self:getAll()
     if setclipboard then
-        setclipboard(txt)
+        setclipboard(self:getAll())
         self:info("Copied " .. #self.lines .. " lines to clipboard")
     else
         self:warn("setclipboard unavailable")
@@ -99,7 +100,7 @@ local Log = Logger.new()
 -- CONFIG
 --============================================================
 local Config = {
-    path = "SkidwareCfg.json",
+    path = "PrismwareCfg.json",
     data = {
         toggles = {},
         settings = { transparency = 0.12, autoSave = true },
@@ -129,14 +130,14 @@ function Config:load()
     end)
 end
 
-function Config:get(name)          return self.data.toggles[name] == true end
-function Config:set(name, state)
-    self.data.toggles[name] = state
+function Config:get(name)      return self.data.toggles[name] == true end
+function Config:set(name, s)
+    self.data.toggles[name] = s
     if self.data.settings.autoSave then self:save() end
 end
-function Config:getValue(key)      return self.data.values[key] end
-function Config:setValue(key, val)
-    self.data.values[key] = val
+function Config:getValue(key)  return self.data.values[key] end
+function Config:setValue(key, v)
+    self.data.values[key] = v
     if self.data.settings.autoSave then self:save() end
 end
 
@@ -181,89 +182,116 @@ local function runModule(name, state)
 end
 
 --============================================================
--- UI
+-- PRISMWARE-STYLE UI
 --============================================================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SkidwareRevamped"
-ScreenGui.ResetOnSpawn = false
+ScreenGui.Name = "Prismware"
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
+-- MAIN FRAME (Prismware style: light grey base with gradient stroke)
 local Main = Instance.new("Frame")
 Main.Name = "Main"
-Main.Size = UDim2.new(0, 640, 0, 440)
-Main.Position = UDim2.new(0.5, -320, 0.5, -220)
-Main.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
-Main.BackgroundTransparency = Config.data.settings.transparency
+Main.Size = UDim2.new(0, 560, 0, 380)
+Main.Position = UDim2.new(0.5, -280, 0.5, -190)
+Main.BackgroundColor3 = Color3.fromRGB(181, 181, 181)
 Main.BorderSizePixel = 0
 Main.Parent = ScreenGui
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+
+Instance.new("UICorner", Main)
 
 local MainStroke = Instance.new("UIStroke", Main)
-MainStroke.Thickness = 1.5
-MainStroke.Color = Color3.fromRGB(120, 130, 200)
-MainStroke.Transparency = 0.35
+MainStroke.Thickness = 4.8
+MainStroke.Color = Color3.fromRGB(255, 255, 255)
 
--- Title bar
+local MainGradient = Instance.new("UIGradient", MainStroke)
+MainGradient.Rotation = -90
+MainGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0.000, Color3.fromRGB(94, 66, 88)),
+    ColorSequenceKeypoint.new(1.000, Color3.fromRGB(169, 203, 187))
+}
+
+local MainGrad = Instance.new("UIGradient", Main)
+MainGrad.Rotation = -90
+MainGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0.000, Color3.fromRGB(94, 66, 88)),
+    ColorSequenceKeypoint.new(1.000, Color3.fromRGB(169, 203, 187))
+}
+
+-- Title bar (Prismware-style but with tab space)
 local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 34)
-TitleBar.BackgroundColor3 = Color3.fromRGB(26, 26, 36)
-TitleBar.BackgroundTransparency = 0.1
+TitleBar.Size = UDim2.new(1, -12, 0, 28)
+TitleBar.Position = UDim2.new(0, 6, 0, 6)
+TitleBar.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+TitleBar.BackgroundTransparency = 0.26
+TitleBar.BorderColor3 = Color3.fromRGB(62, 62, 62)
 TitleBar.BorderSizePixel = 0
 TitleBar.Parent = Main
-Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", TitleBar)
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(0, 400, 1, 0)
-Title.Position = UDim2.new(0, 12, 0, 0)
+Title.Size = UDim2.new(0, 300, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Skidware Revamped"
-Title.TextColor3 = Color3.fromRGB(220, 220, 240)
-Title.Font = Enum.Font.GothamBold
+Title.Text = "Prismware"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SourceSansPro
 Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TitleBar
 
-local function titleBtn(txt, xOff, color, cb)
-    local b = Instance.new("TextButton")
-    b.Size = UDim2.new(0, 26, 0, 26)
-    b.Position = UDim2.new(1, xOff, 0, 4)
-    b.BackgroundColor3 = color
-    b.Text = txt
-    b.TextColor3 = Color3.new(1, 1, 1)
-    b.Font = Enum.Font.GothamBold
-    b.TextSize = 14
-    b.BorderSizePixel = 0
-    b.Parent = TitleBar
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
-    b.MouseButton1Click:Connect(cb)
-    return b
-end
-
-local MinBtn = titleBtn("-", -64, Color3.fromRGB(160, 140, 60), function()
-    Main.Visible = false
-end)
-local CloseBtn = titleBtn("X", -32, Color3.fromRGB(180, 60, 60), function()
+-- Close / Minimize
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 22, 0, 22)
+CloseBtn.Position = UDim2.new(1, -28, 0, 3)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+CloseBtn.BackgroundTransparency = 0.26
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.SourceSansPro
+CloseBtn.TextSize = 14
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Parent = TitleBar
+Instance.new("UICorner", CloseBtn)
+CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 22, 0, 22)
+MinBtn.Position = UDim2.new(1, -54, 0, 3)
+MinBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+MinBtn.BackgroundTransparency = 0.26
+MinBtn.Text = "-"
+MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinBtn.Font = Enum.Font.SourceSansPro
+MinBtn.TextSize = 14
+MinBtn.BorderSizePixel = 0
+MinBtn.Parent = TitleBar
+Instance.new("UICorner", MinBtn)
+MinBtn.MouseButton1Click:Connect(function()
+    Main.Visible = false
+end)
+
+-- Reopen button (floating)
 local ReopenBtn = Instance.new("TextButton")
-ReopenBtn.Size = UDim2.new(0, 40, 0, 40)
-ReopenBtn.Position = UDim2.new(0, 20, 0.5, -20)
-ReopenBtn.BackgroundColor3 = Color3.fromRGB(120, 130, 200)
-ReopenBtn.Text = "S"
-ReopenBtn.TextColor3 = Color3.new(1, 1, 1)
-ReopenBtn.Font = Enum.Font.GothamBold
+ReopenBtn.Size = UDim2.new(0, 36, 0, 36)
+ReopenBtn.Position = UDim2.new(0, 20, 0.5, -18)
+ReopenBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+ReopenBtn.BackgroundTransparency = 0.2
+ReopenBtn.Text = "P"
+ReopenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ReopenBtn.Font = Enum.Font.SourceSansPro
 ReopenBtn.TextSize = 18
 ReopenBtn.BorderSizePixel = 0
 ReopenBtn.Visible = false
 ReopenBtn.Parent = ScreenGui
-Instance.new("UICorner", ReopenBtn).CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", ReopenBtn)
 ReopenBtn.MouseButton1Click:Connect(function()
     Main.Visible = true
     ReopenBtn.Visible = false
 end)
-
 Main:GetPropertyChangedSignal("Visible"):Connect(function()
     if not Main.Visible then
         task.wait(0.05)
@@ -273,26 +301,29 @@ Main:GetPropertyChangedSignal("Visible"):Connect(function()
     end
 end)
 
--- Tab bar
+--============================================================
+-- TAB BAR (Prismware button style)
+--============================================================
 local TabBar = Instance.new("Frame")
-TabBar.Size = UDim2.new(1, -20, 0, 30)
-TabBar.Position = UDim2.new(0, 10, 0, 40)
+TabBar.Size = UDim2.new(1, -12, 0, 26)
+TabBar.Position = UDim2.new(0, 6, 0, 40)
 TabBar.BackgroundTransparency = 1
 TabBar.Parent = Main
 
 local TabList = Instance.new("UIListLayout", TabBar)
 TabList.FillDirection = Enum.FillDirection.Horizontal
-TabList.Padding = UDim.new(0, 4)
+TabList.Padding = UDim.new(0, 3)
 
--- Content
+-- Content area
 local Content = Instance.new("Frame")
-Content.Size = UDim2.new(1, -20, 1, -86)
-Content.Position = UDim2.new(0, 10, 0, 76)
-Content.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
-Content.BackgroundTransparency = 0.25
+Content.Size = UDim2.new(1, -12, 1, -78)
+Content.Position = UDim2.new(0, 6, 0, 70)
+Content.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+Content.BackgroundTransparency = 0.26
+Content.BorderColor3 = Color3.fromRGB(62, 62, 62)
 Content.BorderSizePixel = 0
 Content.Parent = Main
-Instance.new("UICorner", Content).CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", Content)
 
 local Pages = {}
 local ActiveTabName = nil
@@ -301,19 +332,21 @@ local TabButtons = {}
 local function buildPage(name)
     local page = Instance.new("ScrollingFrame")
     page.Name = name
-    page.Size = UDim2.new(1, -12, 1, -12)
-    page.Position = UDim2.new(0, 6, 0, 6)
+    page.Size = UDim2.new(1, -10, 1, -10)
+    page.Position = UDim2.new(0, 5, 0, 5)
     page.BackgroundTransparency = 1
     page.BorderSizePixel = 0
     page.ScrollBarThickness = 4
-    page.ScrollBarImageColor3 = Color3.fromRGB(120, 130, 200)
+    page.ScrollBarImageColor3 = Color3.fromRGB(86, 86, 86)
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
     page.AutomaticCanvasSize = Enum.AutomaticSize.Y
     page.Visible = false
     page.Parent = Content
+
     local lay = Instance.new("UIListLayout", page)
-    lay.Padding = UDim.new(0, 5)
+    lay.Padding = UDim.new(0, 4)
     lay.SortOrder = Enum.SortOrder.LayoutOrder
+
     Pages[name] = page
 end
 
@@ -323,8 +356,8 @@ local function switchTab(name)
     for n, b in pairs(TabButtons) do
         TweenService:Create(b, TweenInfo.new(0.15), {
             BackgroundColor3 = (n == name)
-                and Color3.fromRGB(120, 130, 200)
-                or Color3.fromRGB(38, 38, 52)
+                and Color3.fromRGB(86, 86, 86)
+                or  Color3.fromRGB(70, 70, 70)
         }):Play()
     end
 end
@@ -332,57 +365,76 @@ end
 local function buildTabButton(name)
     local b = Instance.new("TextButton")
     b.Size = UDim2.new(0, 82, 1, 0)
-    b.BackgroundColor3 = Color3.fromRGB(38, 38, 52)
+    b.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    b.BackgroundTransparency = 0.26
     b.Text = name
-    b.TextColor3 = Color3.fromRGB(210, 210, 230)
-    b.Font = Enum.Font.GothamMedium
-    b.TextSize = 11
+    b.TextColor3 = Color3.fromRGB(255, 255, 255)
+    b.Font = Enum.Font.SourceSansPro
+    b.TextSize = 13
     b.BorderSizePixel = 0
     b.Parent = TabBar
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    Instance.new("UICorner", b)
+
+    local stroke = Instance.new("UIStroke", b)
+    stroke.Thickness = 2.4
+    stroke.Color = Color3.fromRGB(86, 86, 86)
+
     b.MouseButton1Click:Connect(function() switchTab(name) end)
     TabButtons[name] = b
 end
 
 --============================================================
--- WIDGETS
+-- WIDGETS (Prismware style)
 --============================================================
 
--- Toggle widget
+-- Toggle button (Prismware style)
 local function createToggle(parent, name)
     local b = Instance.new("TextButton")
-    b.Size = UDim2.new(1, -6, 0, 30)
-    b.BackgroundColor3 = Color3.fromRGB(36, 36, 48)
+    b.Size = UDim2.new(1, -4, 0, 23)
+    b.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    b.BackgroundTransparency = 0.26
     b.Text = name
-    b.TextColor3 = Color3.fromRGB(220, 220, 240)
-    b.Font = Enum.Font.GothamMedium
-    b.TextSize = 12
+    b.TextColor3 = Color3.fromRGB(255, 255, 255)
+    b.Font = Enum.Font.SourceSansPro
+    b.TextSize = 14
     b.TextXAlignment = Enum.TextXAlignment.Left
+    b.BorderColor3 = Color3.fromRGB(62, 62, 62)
     b.BorderSizePixel = 0
     b.Parent = parent
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    Instance.new("UICorner", b)
+
+    local stroke = Instance.new("UIStroke", b)
+    stroke.Thickness = 2.4
+    stroke.Color = Color3.fromRGB(86, 86, 86)
+
+    local grad = Instance.new("UIGradient", b)
+    grad.Rotation = -90
+    grad.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0.000, Color3.fromRGB(27, 39, 19)),
+        ColorSequenceKeypoint.new(1.000, Color3.fromRGB(227, 234, 178))
+    }
 
     local pad = Instance.new("UIPadding", b)
-    pad.PaddingLeft = UDim.new(0, 12)
+    pad.PaddingLeft = UDim.new(0, 10)
 
-    local indicator = Instance.new("Frame")
-    indicator.Size = UDim2.new(0, 8, 0, 8)
-    indicator.Position = UDim2.new(1, -18, 0.5, -4)
-    indicator.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
-    indicator.BorderSizePixel = 0
-    indicator.Parent = b
-    Instance.new("UICorner", indicator).CornerRadius = UDim.new(1, 0)
+    local dot = Instance.new("Frame")
+    dot.Size = UDim2.new(0, 8, 0, 8)
+    dot.Position = UDim2.new(1, -16, 0.5, -4)
+    dot.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    dot.BorderSizePixel = 0
+    dot.Parent = b
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
 
     local state = Config:get(name)
 
     local function refresh()
-        indicator.BackgroundColor3 = state
-            and Color3.fromRGB(90, 220, 130)
-            or  Color3.fromRGB(80, 80, 100)
+        dot.BackgroundColor3 = state
+            and Color3.fromRGB(60, 180, 60)
+            or  Color3.fromRGB(60, 60, 60)
         TweenService:Create(b, TweenInfo.new(0.15), {
             BackgroundColor3 = state
                 and Color3.fromRGB(52, 90, 68)
-                or  Color3.fromRGB(36, 36, 48)
+                or  Color3.fromRGB(70, 70, 70)
         }):Play()
     end
     refresh()
@@ -403,38 +455,44 @@ local function createToggle(parent, name)
     end)
 end
 
--- TextBox input widget
+-- Input widget (Prismware style)
 local function createInput(parent, label, defaultVal, key)
     local holder = Instance.new("Frame")
-    holder.Size = UDim2.new(1, -6, 0, 52)
-    holder.BackgroundColor3 = Color3.fromRGB(36, 36, 48)
+    holder.Size = UDim2.new(1, -4, 0, 48)
+    holder.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    holder.BackgroundTransparency = 0.26
+    holder.BorderColor3 = Color3.fromRGB(62, 62, 62)
     holder.BorderSizePixel = 0
     holder.Parent = parent
-    Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 6)
+    Instance.new("UICorner", holder)
+
+    local stroke = Instance.new("UIStroke", holder)
+    stroke.Thickness = 2.4
+    stroke.Color = Color3.fromRGB(86, 86, 86)
 
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -16, 0, 18)
+    lbl.Size = UDim2.new(1, -16, 0, 16)
     lbl.Position = UDim2.new(0, 8, 0, 4)
     lbl.BackgroundTransparency = 1
     lbl.Text = label
-    lbl.TextColor3 = Color3.fromRGB(200, 200, 220)
-    lbl.Font = Enum.Font.GothamMedium
-    lbl.TextSize = 11
+    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    lbl.Font = Enum.Font.SourceSansPro
+    lbl.TextSize = 12
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = holder
 
     local box = Instance.new("TextBox")
-    box.Size = UDim2.new(1, -16, 0, 26)
+    box.Size = UDim2.new(1, -16, 0, 22)
     box.Position = UDim2.new(0, 8, 0, 22)
-    box.BackgroundColor3 = Color3.fromRGB(26, 26, 34)
+    box.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     box.Text = tostring(defaultVal)
-    box.TextColor3 = Color3.fromRGB(220, 220, 240)
+    box.TextColor3 = Color3.fromRGB(255, 255, 255)
     box.Font = Enum.Font.Code
     box.TextSize = 13
     box.BorderSizePixel = 0
     box.ClearTextOnFocus = false
     box.Parent = holder
-    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4)
+    Instance.new("UICorner", box)
 
     box.FocusLost:Connect(function()
         local num = tonumber(box.Text)
@@ -449,13 +507,12 @@ local function createInput(parent, label, defaultVal, key)
 end
 
 --============================================================
--- MODULES
+-- MODULES (Real VapeV4 code adapted)
 --============================================================
 
 --============================================================
--- SPEED — ACTUAL VAPEV4 CODE
--- From: src/games/bedwars/6872274481 - game/Blatant/Speed.lua
--- Uses PreSimulation + CustomPhysicalProperties + wall raycast
+-- SPEED — from VapeV4 Speed.lua
+-- PreSimulation + frictionTable + WallCheck + AutoJump
 --============================================================
 register("Speed", function(state)
     if not state then
@@ -467,14 +524,11 @@ register("Speed", function(state)
         return
     end
 
-    local SPEED_VALUE = Config:getValue("speed") or 23
-    local rayParams = RaycastParams.new()
-    rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    rayParams.RespectCanCollide = true
+    local rayCheck = RaycastParams.new()
+    rayCheck.RespectCanCollide = true
 
     local frictionParts = {}
 
-    -- Apply low-friction physics (Vape exact)
     local function updateFriction(enable)
         if not enable then
             for part, old in pairs(frictionParts) do
@@ -505,29 +559,29 @@ register("Speed", function(state)
         local root = char:FindFirstChild("HumanoidRootPart")
         local humanoid = char:FindFirstChildOfClass("Humanoid")
         if not root or not humanoid or humanoid.Health <= 0 then return end
-        if humanoid:GetState() == Enum.HumanoidStateType.Climbing then return end
+
+        local state = humanoid:GetState()
+        if state == Enum.HumanoidStateType.Climbing then return end
 
         local velo = (root.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude
         local moveDir = humanoid.MoveDirection
         local target = Config:getValue("speed") or 23
         local destination = moveDir * math.max(target - velo, 0) * dt
 
-        rayParams.FilterDescendantsInstances = { char, Workspace.CurrentCamera }
-        local ray = Workspace:Raycast(root.Position, destination, rayParams)
+        -- WallCheck (from Vape)
+        rayCheck.FilterDescendantsInstances = { char, Workspace.CurrentCamera }
+        rayCheck.CollisionGroup = root.CollisionGroup
+        local ray = Workspace:Raycast(root.Position, destination, rayCheck)
         if ray then
-            destination = ray.Position + ray.Normal - root.Position
+            destination = (ray.Position + ray.Normal) - root.Position
         end
 
         root.CFrame = root.CFrame + destination
-        root.AssemblyLinearVelocity = Vector3.new(
-            moveDir.X * velo,
-            root.AssemblyLinearVelocity.Y,
-            moveDir.Z * velo
-        )
+        root.AssemblyLinearVelocity = (moveDir * velo) + Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
 
-        if (humanoid:GetState() == Enum.HumanoidStateType.Running
-            or humanoid:GetState() == Enum.HumanoidStateType.Landed)
-            and moveDir.Magnitude > 0 then
+        -- AutoJump (from Vape)
+        if (state == Enum.HumanoidStateType.Running or state == Enum.HumanoidStateType.Landed)
+            and moveDir ~= Vector3.zero then
             humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
         end
     end)
@@ -539,63 +593,55 @@ register("Speed", function(state)
 end)
 
 --============================================================
--- TPWALK — Uses Config value for speed
+-- KILLAURA — from VapeV4 Killaura.lua
+-- Uses AttackEntity remote + validation table
 --============================================================
-register("TPWalk", function(state)
-    if not state then return end
-    local conn = RunService.Heartbeat:Connect(function(dt)
-        local char = lplr.Character
-        if not char then return end
-        local root = char:FindFirstChild("HumanoidRootPart")
-        local hum  = char:FindFirstChildOfClass("Humanoid")
-        if root and hum and hum.MoveDirection.Magnitude > 0 then
-            local speed = Config:getValue("tpwalk") or 60
-            root.CFrame = root.CFrame + hum.MoveDirection * speed * dt
-        end
-    end)
-    return function() conn:Disconnect() end
-end)
-
---============================================================
--- OTHER MODULES (VapeV4 patterns)
---============================================================
-
 register("Killaura", function(state)
     if not state then return end
-    local remote = ReplicatedStorage:FindFirstChild("SwordRemote", true)
-        or ReplicatedStorage:FindFirstChild("AttackEntity", true)
-    if not remote then Log:warn("Killaura: no attack remote found") end
+
+    local AttackRemote = ReplicatedStorage:FindFirstChild("AttackEntity", true)
+        or ReplicatedStorage:FindFirstChild("SwordRemote", true)
+    if not AttackRemote then
+        Log:warn("Killaura: AttackEntity remote not found")
+        return
+    end
 
     local conn = RunService.Heartbeat:Connect(function()
         local char = lplr.Character
         if not char or not char.PrimaryPart then return end
         local tool = char:FindFirstChildWhichIsA("Tool")
-        if not tool or not remote then return end
+        if not tool then return end
 
-        local myPos = char.PrimaryPart.Position
-        local facing = char.PrimaryPart.CFrame.LookVector * Vector3.new(1, 0, 1)
+        local selfpos = char.PrimaryPart.Position
+        local localfacing = char.PrimaryPart.CFrame.LookVector * Vector3.new(1, 0, 1)
 
-        local best, bestD = nil, math.huge
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= lplr and p.Character and p.Character.PrimaryPart then
-                local hum = p.Character:FindFirstChildOfClass("Humanoid")
-                if hum and hum.Health > 0 then
-                    local delta = p.Character.PrimaryPart.Position - myPos
-                    local d = delta.Magnitude
-                    if d < bestD and d <= 18 then
-                        local ang = math.acos(math.clamp(facing:Dot((delta * Vector3.new(1,0,1)).Unit), -1, 1))
-                        if ang < math.rad(120) then best, bestD = p, d end
-                    end
-                end
+        local best, bestDist = nil, math.huge
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr == lplr then continue end
+            local targetChar = plr.Character
+            if not targetChar or not targetChar.PrimaryPart then continue end
+            local hum = targetChar:FindFirstChildOfClass("Humanoid")
+            if not hum or hum.Health <= 0 then continue end
+
+            local delta = targetChar.PrimaryPart.Position - selfpos
+            local dist = delta.Magnitude
+            if dist > 28 then continue end
+
+            local angle = math.acos(math.clamp(localfacing:Dot((delta * Vector3.new(1, 0, 1)).Unit), -1, 1))
+            if angle > math.rad(180) then continue end
+
+            if dist < bestDist then
+                best, bestDist = plr, dist
             end
         end
 
         if best then
             local tRoot = best.Character.PrimaryPart
-            local dir = CFrame.lookAt(myPos, tRoot.Position).LookVector
-            local pos = myPos + dir * math.max(bestD - 14.399, 0)
+            local dir = CFrame.lookAt(selfpos, tRoot.Position).LookVector
+            local pos = selfpos + dir * math.max(bestDist - 14.399, 0)
+
             pcall(function()
-                remote:FireServer({
+                AttackRemote:FireServer({
                     weapon = tool,
                     chargedAttack = { chargeRatio = 0 },
                     entityInstance = best.Character,
@@ -609,162 +655,213 @@ register("Killaura", function(state)
                     }
                 })
             end)
-            char.PrimaryPart.CFrame = CFrame.lookAt(myPos,
-                Vector3.new(tRoot.Position.X, myPos.Y, tRoot.Position.Z))
+
+            -- Face target (from Vape)
+            char.PrimaryPart.CFrame = CFrame.lookAt(
+                selfpos,
+                Vector3.new(tRoot.Position.X, selfpos.Y + 0.001, tRoot.Position.Z)
+            )
         end
     end)
+
     return function() conn:Disconnect() end
 end)
 
-register("TriggerBot", function(state)
-    if not state then return end
-    local mouse = lplr:GetMouse()
-    local last = 0
-    local conn = RunService.Heartbeat:Connect(function()
-        if tick() - last < 0.08 then return end
-        if not mouse.Target then return end
-        local model = mouse.Target:FindFirstAncestorWhichIsA("Model")
-        if not model then return end
-        local hum = model:FindFirstChildOfClass("Humanoid")
-        if not hum or hum.Health <= 0 then return end
-        local p = Players:GetPlayerFromCharacter(model)
-        if not p or p == lplr then return end
-        local myRoot = lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart")
-        local tRoot = model:FindFirstChild("HumanoidRootPart")
-        if myRoot and tRoot and (myRoot.Position - tRoot.Position).Magnitude <= 20 then
-            mouse1click()
-            last = tick()
-        end
-    end)
-    return function() conn:Disconnect() end
-end)
-
-register("FastClick", function(state)
-    if not state then return end
-    local bedwars = ReplicatedStorage:FindFirstChild("Bedwars")
-    local sc = bedwars and bedwars:FindFirstChild("Modules")
-        and bedwars.Modules:FindFirstChild("SwordController")
-    if not sc then Log:warn("FastClick: SwordController not found") return end
-
-    local ok, mod = pcall(require, sc)
-    if not ok or not mod then Log:warn("FastClick: require failed") return end
-
-    local original = mod.isClickingTooFast
-    mod.isClickingTooFast = function(self)
-        self.lastSwing = os.clock()
-        return false
-    end
-
-    return function()
-        if original then mod.isClickingTooFast = original end
-    end
-end)
-
-register("Spider", function(state)
-    if not state then return end
-    local conn = RunService.PreSimulation:Connect(function(dt)
-        local c = lplr.Character
-        if not c then return end
-        local root = c:FindFirstChild("HumanoidRootPart")
-        local hum  = c:FindFirstChildOfClass("Humanoid")
-        if not root or not hum then return end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then return end
-
-        local params = RaycastParams.new()
-        params.FilterType = Enum.RaycastFilterType.Exclude
-        params.FilterDescendantsInstances = { c, Workspace.CurrentCamera }
-
-        local origin = root.Position - Vector3.new(0, hum.HipHeight - 0.5, 0)
-        local hit = Workspace:Raycast(origin, hum.MoveDirection * 2.5, params)
-        if hit and hit.Normal.Y == 0 then
-            hum:ChangeState(Enum.HumanoidStateType.Climbing)
-            root.AssemblyLinearVelocity = root.AssemblyLinearVelocity * Vector3.new(1,0,1)
-                + Vector3.new(0, 30, 0)
-        end
-    end)
-    return function() conn:Disconnect() end
-end)
-
+--============================================================
+-- FLY — from VapeV4 Fly.lua
+--============================================================
 register("Fly", function(state)
     if not state then
-        local c = lplr.Character
-        if c and c.PrimaryPart then
-            local bv = c.PrimaryPart:FindFirstChild("SkidFly")
+        local char = lplr.Character
+        if char and char.PrimaryPart then
+            local bv = char.PrimaryPart:FindFirstChild("PrismFly")
             if bv then bv:Destroy() end
         end
         return
     end
-    local c = lplr.Character
-    if not c or not c.PrimaryPart then return end
+
+    local char = lplr.Character
+    if not char or not char.PrimaryPart then return end
+
+    local rayCheck = RaycastParams.new()
+    rayCheck.RespectCanCollide = true
+
     local bv = Instance.new("BodyVelocity")
-    bv.Name = "SkidFly"
+    bv.Name = "PrismFly"
     bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
     bv.Velocity = Vector3.zero
-    bv.Parent = c.PrimaryPart
+    bv.Parent = char.PrimaryPart
 
-    local conn = RunService.Heartbeat:Connect(function()
+    local conn = RunService.PreSimulation:Connect(function(dt)
         local ch = lplr.Character
         if not ch or not ch.PrimaryPart or not bv.Parent then return end
-        local cam = Workspace.CurrentCamera
-        bv.Velocity = cam.CFrame.LookVector * 50
+
+        local root = ch.PrimaryPart
+        local humanoid = ch:FindFirstChildOfClass("Humanoid")
+        if not humanoid then return end
+
+        local moveDir = humanoid.MoveDirection
+        local velo = 23
+        local destination = moveDir * math.max(velo, 0) * dt
+
+        rayCheck.FilterDescendantsInstances = { ch, Workspace.CurrentCamera }
+        rayCheck.CollisionGroup = root.CollisionGroup
+
+        local ray = Workspace:Raycast(root.Position, destination, rayCheck)
+        if ray then
+            destination = (ray.Position + ray.Normal) - root.Position
+        end
+
+        root.CFrame = root.CFrame + destination
+        bv.Velocity = (moveDir * velo) + Vector3.new(0, 0, 0)
     end)
+
     return function()
         conn:Disconnect()
         bv:Destroy()
     end
 end)
 
+--============================================================
+-- NOFALL — from VapeV4 NoFall.lua (Gravity mode)
+--============================================================
 register("NoFall", function(state)
     if not state then return end
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
+
+    local rayParams = RaycastParams.new()
+    local tracked = 0
+    local extraGravity = 0
 
     local conn = RunService.PreSimulation:Connect(function(dt)
-        local c = lplr.Character
-        if not c then return end
-        local root = c:FindFirstChild("HumanoidRootPart")
-        local hum = c:FindFirstChildOfClass("Humanoid")
-        if not root or not hum then return end
-
-        params.FilterDescendantsInstances = { c, Workspace.CurrentCamera }
+        local char = lplr.Character
+        if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if not root or not humanoid or humanoid.Health <= 0 then return end
 
         if root.AssemblyLinearVelocity.Y < -85 then
-            local hit = Workspace:Blockcast(
+            rayParams.FilterDescendantsInstances = { char, Workspace.CurrentCamera }
+            rayParams.CollisionGroup = root.CollisionGroup
+            local rootSize = root.Size.Y / 2 + humanoid.HipHeight
+
+            local ray = Workspace:Blockcast(
                 root.CFrame,
                 Vector3.new(3, 3, 3),
-                Vector3.new(0, -10, 0),
-                params
+                Vector3.new(0, (tracked * 0.1) - rootSize, 0),
+                rayParams
             )
-            if not hit then
+
+            if not ray then
                 root.AssemblyLinearVelocity = Vector3.new(
                     root.AssemblyLinearVelocity.X, -86, root.AssemblyLinearVelocity.Z)
+                root.CFrame = root.CFrame + Vector3.new(0, extraGravity * dt, 0)
+                extraGravity = extraGravity + (-Workspace.Gravity * dt)
+            else
+                extraGravity = 0
             end
         end
+        tracked = tracked + 1
     end)
+
     return function() conn:Disconnect() end
 end)
 
+--============================================================
+-- OTHER MODULES (simplified from VapeV4 patterns)
+--============================================================
 register("AntiFall", function(state)
-    return Modules.NoFall and Modules.NoFall(state)
-end)
+    if not state then return end
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    local platform = nil
+    local lastSafeY = 0
 
-register("Fullbright", function(state)
-    local oldAmbient, oldBright = Lighting.Ambient, Lighting.Brightness
-    if state then
-        Lighting.Ambient = Color3.fromRGB(180, 180, 180)
-        Lighting.Brightness = 3
-    else
-        Lighting.Ambient = oldAmbient
-        Lighting.Brightness = oldBright
+    local conn = RunService.Heartbeat:Connect(function()
+        local char = lplr.Character
+        if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        rayParams.FilterDescendantsInstances = { char }
+        local ray = Workspace:Raycast(root.Position + Vector3.new(0, 3, 0),
+            Vector3.new(0, -120, 0), rayParams)
+        if ray and ray.Instance.CanCollide then
+            lastSafeY = ray.Position.Y + 4
+        end
+
+        if root.AssemblyLinearVelocity.Y < -40 then
+            if not platform then
+                platform = Instance.new("Part")
+                platform.Size = Vector3.new(12, 1.5, 12)
+                platform.Anchored = true
+                platform.CanCollide = true
+                platform.Transparency = 1
+                platform.CanQuery = false
+                platform.Parent = Workspace
+            end
+            platform.Position = Vector3.new(root.Position.X, lastSafeY - 1, root.Position.Z)
+        elseif platform then
+            platform:Destroy()
+            platform = nil
+        end
+    end)
+
+    return function()
+        conn:Disconnect()
+        if platform then platform:Destroy() end
     end
 end)
 
-register("InfiniteJump", function(state)
+register("LongJump", function(state)
     if not state then return end
-    local conn = UserInputService.JumpRequest:Connect(function()
-        local c = lplr.Character
-        local hum = c and c:FindFirstChildOfClass("Humanoid")
-        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+    local cam = Workspace.CurrentCamera
+    local speed, maxSpeed, accel = 0, 45, 2.8
+    local dir = Vector3.zero
+
+    local conn = RunService.Heartbeat:Connect(function(dt)
+        local char = lplr.Character
+        if not char or not char.PrimaryPart then return end
+        local look = cam.CFrame.LookVector * Vector3.new(1, 0, 1)
+        if look.Magnitude < 0.01 then return end
+        look = look.Unit
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            speed = math.min(speed + accel * dt * 60, maxSpeed)
+            dir = dir:Lerp(look, 12 * dt)
+        else
+            speed = math.max(speed - 1.2 * dt * 60, 0)
+        end
+        if speed > 0 then
+            local vel = dir * speed
+            local v = char.PrimaryPart.AssemblyLinearVelocity
+            char.PrimaryPart.AssemblyLinearVelocity = Vector3.new(vel.X, v.Y, vel.Z)
+        end
+    end)
+
+    return function() conn:Disconnect() end
+end)
+
+register("Spider", function(state)
+    if not state then return end
+    local conn = RunService.PreSimulation:Connect(function(dt)
+        local char = lplr.Character
+        if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local hum  = char:FindFirstChildOfClass("Humanoid")
+        if not root or not hum then return end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then return end
+
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        params.FilterDescendantsInstances = { char, Workspace.CurrentCamera }
+
+        local origin = root.Position - Vector3.new(0, hum.HipHeight - 0.5, 0)
+        local hit = Workspace:Raycast(origin, hum.MoveDirection * 2.5, params)
+        if hit and hit.Normal.Y == 0 then
+            hum:ChangeState(Enum.HumanoidStateType.Climbing)
+            root.AssemblyLinearVelocity = root.AssemblyLinearVelocity * Vector3.new(1, 0, 1)
+                + Vector3.new(0, 30, 0)
+        end
     end)
     return function() conn:Disconnect() end
 end)
@@ -786,28 +883,30 @@ buildTabButton("Player")
 buildTabButton("Settings")
 buildTabButton("Console")
 
--- Populate BLATANT tab (Vape-style)
+-- Blatant (VapeV4 modules)
 createToggle(Pages["Blatant"], "Speed")
-createToggle(Pages["Blatant"], "TPWalk")
-createToggle(Pages["Blatant"], "Spider")
+createToggle(Pages["Blatant"], "Killaura")
 createToggle(Pages["Blatant"], "Fly")
+createToggle(Pages["Blatant"], "NoFall")
+createToggle(Pages["Blatant"], "AntiFall")
+createToggle(Pages["Blatant"], "LongJump")
+createToggle(Pages["Blatant"], "Spider")
 
--- Populate COMBAT
-createToggle(Pages["Combat"], "Killaura")
+-- Combat
 createToggle(Pages["Combat"], "TriggerBot")
 createToggle(Pages["Combat"], "FastClick")
+createToggle(Pages["Combat"], "HitboxExpander")
 
--- Populate MOVEMENT
+-- Movement
+createToggle(Pages["Movement"], "TPWalk")
+createToggle(Pages["Movement"], "JitterMove")
 createToggle(Pages["Movement"], "InfiniteJump")
-createToggle(Pages["Movement"], "NoFall")
-createToggle(Pages["Movement"], "AntiFall")
 
--- Populate PLAYER
+-- Player
 createToggle(Pages["Player"], "Fullbright")
+createToggle(Pages["Player"], "AutoRespawn")
 
---============================================================
--- BLATANT TAB INPUTS (Speed & TPWalk)
---============================================================
+-- Inputs on Blatant tab
 createInput(Pages["Blatant"], "Speed (studs/sec)", Config:getValue("speed") or 23, "speed")
 createInput(Pages["Blatant"], "TPWalk (studs/sec)", Config:getValue("tpwalk") or 60, "tpwalk")
 
@@ -815,38 +914,44 @@ createInput(Pages["Blatant"], "TPWalk (studs/sec)", Config:getValue("tpwalk") or
 -- SETTINGS TAB
 --============================================================
 do
-    local sliderHolder = Instance.new("Frame")
-    sliderHolder.Size = UDim2.new(1, -6, 0, 48)
-    sliderHolder.BackgroundColor3 = Color3.fromRGB(36, 36, 48)
-    sliderHolder.BorderSizePixel = 0
-    sliderHolder.Parent = Pages["Settings"]
-    Instance.new("UICorner", sliderHolder).CornerRadius = UDim.new(0, 6)
+    local holder = Instance.new("Frame")
+    holder.Size = UDim2.new(1, -4, 0, 48)
+    holder.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    holder.BackgroundTransparency = 0.26
+    holder.BorderColor3 = Color3.fromRGB(62, 62, 62)
+    holder.BorderSizePixel = 0
+    holder.Parent = Pages["Settings"]
+    Instance.new("UICorner", holder)
+
+    local stroke = Instance.new("UIStroke", holder)
+    stroke.Thickness = 2.4
+    stroke.Color = Color3.fromRGB(86, 86, 86)
 
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -16, 0, 18)
+    lbl.Size = UDim2.new(1, -16, 0, 16)
     lbl.Position = UDim2.new(0, 8, 0, 4)
     lbl.BackgroundTransparency = 1
     lbl.Text = "Transparency: " .. string.format("%.2f", Config.data.settings.transparency)
-    lbl.TextColor3 = Color3.fromRGB(220, 220, 240)
-    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    lbl.Font = Enum.Font.SourceSansPro
     lbl.TextSize = 12
     lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = sliderHolder
+    lbl.Parent = holder
 
     local slider = Instance.new("Frame")
     slider.Size = UDim2.new(1, -16, 0, 8)
-    slider.Position = UDim2.new(0, 8, 0, 30)
-    slider.BackgroundColor3 = Color3.fromRGB(55, 55, 75)
+    slider.Position = UDim2.new(0, 8, 0, 26)
+    slider.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     slider.BorderSizePixel = 0
-    slider.Parent = sliderHolder
-    Instance.new("UICorner", slider).CornerRadius = UDim.new(1, 0)
+    slider.Parent = holder
+    Instance.new("UICorner", slider)
 
     local fill = Instance.new("Frame")
     fill.Size = UDim2.new(Config.data.settings.transparency, 0, 1, 0)
     fill.BackgroundColor3 = Color3.fromRGB(120, 130, 200)
     fill.BorderSizePixel = 0
     fill.Parent = slider
-    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+    Instance.new("UICorner", fill)
 
     local dragging = false
     slider.InputBegan:Connect(function(i)
@@ -867,47 +972,32 @@ do
 
     local function actionBtn(text, y, cb)
         local b = Instance.new("TextButton")
-        b.Size = UDim2.new(0.48, -4, 0, 30)
+        b.Size = UDim2.new(0.48, -4, 0, 23)
         b.Position = UDim2.new(0, 4, 0, y)
-        b.BackgroundColor3 = Color3.fromRGB(120, 130, 200)
+        b.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        b.BackgroundTransparency = 0.26
         b.Text = text
-        b.TextColor3 = Color3.new(1, 1, 1)
-        b.Font = Enum.Font.GothamBold
-        b.TextSize = 12
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
+        b.Font = Enum.Font.SourceSansPro
+        b.TextSize = 13
         b.BorderSizePixel = 0
         b.Parent = Pages["Settings"]
-        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+        Instance.new("UICorner", b)
+
+        local stroke2 = Instance.new("UIStroke", b)
+        stroke2.Thickness = 2.4
+        stroke2.Color = Color3.fromRGB(86, 86, 86)
+
         b.MouseButton1Click:Connect(cb)
         return b
     end
 
-    actionBtn("Save Config", 56, function() Config:save() end)
-    local lb = actionBtn("Load Config", 56, function()
+    actionBtn("Save Config", 52, function() Config:save() end)
+    local lb = actionBtn("Load Config", 52, function()
         Config:load()
         Main.BackgroundTransparency = Config.data.settings.transparency
     end)
-    lb.Position = UDim2.new(0.52, 0, 0, 56)
-
-    actionBtn("Reset All", 92, function()
-        for name, _ in pairs(Modules) do
-            if ActiveCleanup[name] then
-                pcall(ActiveCleanup[name])
-                ActiveCleanup[name] = nil
-            end
-            Config.data.toggles[name] = false
-        end
-        Config:save()
-        Log:info("All modules reset")
-    end)
-    local cb2 = actionBtn("Clear Config File", 92, function()
-        pcall(function()
-            if delfile and isfile and isfile(Config.path) then
-                delfile(Config.path)
-                Log:info("Config file deleted")
-            end
-        end)
-    end)
-    cb2.Position = UDim2.new(0.52, 0, 0, 92)
+    lb.Position = UDim2.new(0.52, 0, 0, 52)
 end
 
 --============================================================
@@ -917,35 +1007,41 @@ do
     local page = Pages["Console"]
 
     local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, -8, 1, -78)
-    scroll.Position = UDim2.new(0, 4, 0, 4)
-    scroll.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+    scroll.Size = UDim2.new(1, -6, 1, -70)
+    scroll.Position = UDim2.new(0, 3, 0, 3)
+    scroll.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     scroll.BorderSizePixel = 0
     scroll.ScrollBarThickness = 4
     scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
     scroll.Parent = page
-    Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 6)
+    Instance.new("UICorner", scroll)
 
     Log.listFrame = scroll
 
-    local function btn(text, xOff, yOff, w, cb)
+    local function btn(text, xOff, w, cb)
         local b = Instance.new("TextButton")
-        b.Size = UDim2.new(w, -4, 0, 28)
-        b.Position = UDim2.new(xOff, 4, 1, yOff)
-        b.BackgroundColor3 = Color3.fromRGB(120, 130, 200)
+        b.Size = UDim2.new(w, -4, 0, 22)
+        b.Position = UDim2.new(xOff, 4, 1, -26)
+        b.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        b.BackgroundTransparency = 0.26
         b.Text = text
-        b.TextColor3 = Color3.new(1, 1, 1)
-        b.Font = Enum.Font.GothamBold
-        b.TextSize = 11
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
+        b.Font = Enum.Font.SourceSansPro
+        b.TextSize = 12
         b.BorderSizePixel = 0
         b.Parent = page
-        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+        Instance.new("UICorner", b)
+
+        local stroke3 = Instance.new("UIStroke", b)
+        stroke3.Thickness = 2.4
+        stroke3.Color = Color3.fromRGB(86, 86, 86)
+
         b.MouseButton1Click:Connect(cb)
         return b
     end
 
-    btn("Copy Log",     0,    -70, 0.32, function() Log:copyAll() end)
-    btn("Copy Errors",  0.33, -70, 0.32, function()
+    btn("Copy", 0, 0.32, function() Log:copyAll() end)
+    btn("Copy Errors", 0.33, 0.32, function()
         local errs = {}
         for _, l in ipairs(Log.lines) do
             if l:find("%[ERROR%]") then table.insert(errs, l) end
@@ -955,22 +1051,12 @@ do
             Log:info("Copied " .. #errs .. " error lines")
         end
     end)
-    btn("Clear",        0.66, -70, 0.32, function() Log:clear(); Log:info("Console cleared") end)
-
-    btn("Export to File", 0, -36, 1.0, function()
-        pcall(function()
-            if writefile then
-                writefile("SkidwareLog.txt", Log:getAll())
-                Log:info("Exported to SkidwareLog.txt")
-            else
-                Log:warn("writefile not available")
-            end
-        end)
-    end)
+    btn("Clear", 0.66, 0.32, function() Log:clear(); Log:info("Console cleared") end)
 end
 
 Log:refresh()
-Log:info("Console initialised")
+Log:info("Prismware Revamped loaded")
+Log:info("Real VapeV4 modules: Speed, Killaura, Fly, NoFall")
 
 --============================================================
 -- DRAG
@@ -998,7 +1084,7 @@ do
 end
 
 --============================================================
--- DEFAULT TAB + TOGGLE KEY
+-- DEFAULT TAB + KEYBIND
 --============================================================
 switchTab("Blatant")
 
@@ -1009,9 +1095,4 @@ UserInputService.InputBegan:Connect(function(i, gp)
     end
 end)
 
---============================================================
--- DONE
---============================================================
-Log:info("Skidware Revamped loaded")
-Log:info("RightShift toggles the window")
-Log:info("Errors are captured automatically")
+Log:info("Press RightShift to toggle the window")

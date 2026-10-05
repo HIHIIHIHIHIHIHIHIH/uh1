@@ -1,7 +1,7 @@
 --[[
-    PRISMWARE REVAMPED v2
-    UI: Prismware (old Skidware) style, rebuilt with auto-resize
-    Modules: Real VapeV4 code (Speed.lua, Killaura.lua, Fly.lua, NoFall.lua)
+    PRISMWARE REVAMPED v3
+    Fixed-size UI (no deferred recalc) + auto-fit window
+    Modules: Real VapeV4 Speed / Killaura / Fly / NoFall
 ]]
 
 local Players           = game:GetService("Players")
@@ -19,23 +19,20 @@ local PlayerGui = lplr:WaitForChild("PlayerGui")
 --============================================================
 -- LOGGER
 --============================================================
-local Logger = {}
-Logger.__index = Logger
-function Logger.new()
-    return setmetatable({ lines = {}, maxLines = 300, listFrame = nil }, Logger)
-end
-function Logger:log(level, msg)
+local Log = { lines = {}, listFrame = nil, maxLines = 300 }
+
+function Log:add(level, msg)
     local line = string.format("[%s] [%s] %s", os.date("%H:%M:%S"), level, tostring(msg))
     table.insert(self.lines, line)
     if #self.lines > self.maxLines then table.remove(self.lines, 1) end
     print(line)
     self:refresh()
 end
-function Logger:info(m)  self:log("INFO",  m) end
-function Logger:warn(m)  self:log("WARN",  m) end
-function Logger:error(m) self:log("ERROR", m) end
+function Log:info(m)  self:add("INFO", m) end
+function Log:warn(m)  self:add("WARN", m) end
+function Log:error(m) self:add("ERROR", m) end
 
-function Logger:refresh()
+function Log:refresh()
     if not self.listFrame or not self.listFrame.Parent then return end
     for _, c in ipairs(self.listFrame:GetChildren()) do
         if c:IsA("TextLabel") then c:Destroy() end
@@ -57,28 +54,17 @@ function Logger:refresh()
         lbl.TextXAlignment = Enum.TextXAlignment.Left
         lbl.Parent = self.listFrame
     end
-    task.defer(function()
-        if self.listFrame and self.listFrame.Parent then
-            local layout = self.listFrame:FindFirstChildOfClass("UIListLayout")
-            local h = layout and layout.AbsoluteContentSize.Y or 0
-            self.listFrame.CanvasSize = UDim2.new(0, 0, 0, h + 8)
-            self.listFrame.CanvasPosition = Vector2.new(0, math.max(0, h + 8 - self.listFrame.AbsoluteSize.Y))
-        end
-    end)
 end
 
-function Logger:getAll() return table.concat(self.lines, "\n") end
-function Logger:copyAll()
+function Log:copyAll()
     if setclipboard then
-        setclipboard(self:getAll())
+        setclipboard(table.concat(self.lines, "\n"))
         self:info("Copied " .. #self.lines .. " lines")
     else
         self:warn("setclipboard unavailable")
     end
 end
-function Logger:clear() self.lines = {}; self:refresh() end
-
-local Log = Logger.new()
+function Log:clear() self.lines = {}; self:refresh() end
 
 --============================================================
 -- CONFIG
@@ -87,16 +73,13 @@ local Config = {
     path = "PrismwareCfg.json",
     data = {
         toggles  = {},
-        settings = { transparency = 0.05, autoSave = true },
+        settings = { transparency = 0.08, autoSave = true },
         values   = { speed = 23, tpwalk = 60 },
     },
 }
 function Config:save()
     pcall(function()
-        if writefile then
-            writefile(self.path, HttpService:JSONEncode(self.data))
-            Log:info("Config saved")
-        end
+        if writefile then writefile(self.path, HttpService:JSONEncode(self.data)) end
     end)
 end
 function Config:load()
@@ -106,13 +89,12 @@ function Config:load()
             if dec.toggles  then self.data.toggles  = dec.toggles  end
             if dec.settings then self.data.settings = dec.settings end
             if dec.values   then self.data.values   = dec.values   end
-            Log:info("Config loaded")
         end
     end)
 end
-function Config:get(name)     return self.data.toggles[name] == true end
-function Config:set(name, s)
-    self.data.toggles[name] = s
+function Config:get(n)        return self.data.toggles[n] == true end
+function Config:set(n, s)
+    self.data.toggles[n] = s
     if self.data.settings.autoSave then self:save() end
 end
 function Config:getValue(k)   return self.data.values[k] end
@@ -125,11 +107,11 @@ Config:load()
 --============================================================
 -- MODULE REGISTRY
 --============================================================
-local Modules       = {}
-local ActiveCleanup = {}
+local Modules, ActiveCleanup = {}, {}
 local function register(name, fn) Modules[name] = fn end
 
 local function runModule(name, state)
+    if not Modules[name] then return false end
     if state then
         if ActiveCleanup[name] then pcall(ActiveCleanup[name]); ActiveCleanup[name] = nil end
         local ok, result = pcall(Modules[name], true)
@@ -150,7 +132,19 @@ local function runModule(name, state)
 end
 
 --============================================================
--- UI
+-- UI CONSTANTS
+--============================================================
+local UI_W        = 560
+local UI_H        = 400
+local PAD         = 6
+local TITLE_H     = 28
+local TAB_H       = 24
+local TAB_W       = 84
+local TAB_GAP     = 3
+local TOP_CONTENT = PAD + TITLE_H + 4 + TAB_H + 4
+
+--============================================================
+-- ROOT
 --============================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "Prismware"
@@ -159,33 +153,16 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.Parent = PlayerGui
 
--- Layout constants
-local TAB_W        = 84
-local TAB_H        = 24
-local TAB_PAD      = 3
-local TITLE_H      = 28
-local CONTENT_PAD  = 6
-local TOP_PAD      = 6
-
 local Main = Instance.new("Frame")
 Main.Name = "Main"
-Main.BackgroundColor3 = Color3.fromRGB(160, 160, 168)
+Main.Size = UDim2.new(0, UI_W, 0, UI_H)
+Main.Position = UDim2.new(0.5, -UI_W/2, 0.5, -UI_H/2)
+Main.BackgroundColor3 = Color3.fromRGB(165, 165, 172)
 Main.BackgroundTransparency = Config.data.settings.transparency
 Main.BorderSizePixel = 0
-Main.Position = UDim2.new(0.5, 0, 0.5, 0)
-Main.AnchorPoint = Vector2.new(0.5, 0.5)
 Main.Parent = ScreenGui
 Instance.new("UICorner", Main)
 
-local MainStroke = Instance.new("UIStroke", Main)
-MainStroke.Thickness = 3
-MainStroke.Color = Color3.fromRGB(255, 255, 255)
-local MainGradStroke = Instance.new("UIGradient", MainStroke)
-MainGradStroke.Rotation = -90
-MainGradStroke.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(94, 66, 88)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(169, 203, 187))
-}
 local MainGrad = Instance.new("UIGradient", Main)
 MainGrad.Rotation = -90
 MainGrad.Color = ColorSequence.new{
@@ -193,29 +170,39 @@ MainGrad.Color = ColorSequence.new{
     ColorSequenceKeypoint.new(1, Color3.fromRGB(169, 203, 187))
 }
 
--- Title bar
+local MainStroke = Instance.new("UIStroke", Main)
+MainStroke.Thickness = 3
+MainStroke.Color = Color3.fromRGB(255, 255, 255)
+
+--============================================================
+-- TITLE BAR
+--============================================================
 local TitleBar = Instance.new("Frame")
 TitleBar.Name = "TitleBar"
+TitleBar.Size = UDim2.new(1, -PAD*2, 0, TITLE_H)
+TitleBar.Position = UDim2.new(0, PAD, 0, PAD)
 TitleBar.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-TitleBar.BackgroundTransparency = 0.2
+TitleBar.BackgroundTransparency = 0.15
 TitleBar.BorderSizePixel = 0
 TitleBar.Parent = Main
 Instance.new("UICorner", TitleBar)
 
-local Title = Instance.new("TextLabel")
-Title.BackgroundTransparency = 1
-Title.Text = "Prismware"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Font = Enum.Font.SourceSansPro
-Title.TextSize = 14
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = TitleBar
+local TitleLbl = Instance.new("TextLabel")
+TitleLbl.Size = UDim2.new(1, -80, 1, 0)
+TitleLbl.Position = UDim2.new(0, 10, 0, 0)
+TitleLbl.BackgroundTransparency = 1
+TitleLbl.Text = "Prismware"
+TitleLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLbl.Font = Enum.Font.SourceSansPro
+TitleLbl.TextSize = 14
+TitleLbl.TextXAlignment = Enum.TextXAlignment.Left
+TitleLbl.Parent = TitleBar
 
-local function titleBtn(txt, color, cb)
+local function titleBtn(txt, xOff, bgColor, cb)
     local b = Instance.new("TextButton")
     b.Size = UDim2.new(0, 20, 0, 20)
-    b.BackgroundColor3 = color
-    b.BackgroundTransparency = 0.2
+    b.Position = UDim2.new(1, xOff, 0, 4)
+    b.BackgroundColor3 = bgColor
     b.Text = txt
     b.TextColor3 = Color3.fromRGB(255, 255, 255)
     b.Font = Enum.Font.SourceSansPro
@@ -223,15 +210,12 @@ local function titleBtn(txt, color, cb)
     b.BorderSizePixel = 0
     b.Parent = TitleBar
     Instance.new("UICorner", b)
-    local st = Instance.new("UIStroke", b)
-    st.Thickness = 1.5
-    st.Color = Color3.fromRGB(86, 86, 86)
     b.MouseButton1Click:Connect(cb)
     return b
 end
 
-local CloseBtn = titleBtn("X", Color3.fromRGB(140, 60, 60), function() ScreenGui:Destroy() end)
-local MinBtn   = titleBtn("-", Color3.fromRGB(140, 120, 60), function() Main.Visible = false end)
+titleBtn("X", -24, Color3.fromRGB(140, 60, 60), function() ScreenGui:Destroy() end)
+titleBtn("-", -48, Color3.fromRGB(140, 120, 60), function() Main.Visible = false end)
 
 -- Reopen
 local ReopenBtn = Instance.new("TextButton")
@@ -259,55 +243,53 @@ Main:GetPropertyChangedSignal("Visible"):Connect(function()
     end
 end)
 
--- Tab container (grid, wraps!)
+--============================================================
+-- TAB BAR (manual positioning)
+--============================================================
 local TabBar = Instance.new("Frame")
 TabBar.Name = "TabBar"
+TabBar.Size = UDim2.new(1, -PAD*2, 0, TAB_H)
+TabBar.Position = UDim2.new(0, PAD, 0, PAD + TITLE_H + 4)
 TabBar.BackgroundTransparency = 1
 TabBar.Parent = Main
-local TabGrid = Instance.new("UIGridLayout", TabBar)
-TabGrid.CellSize = UDim2.new(0, TAB_W, 0, TAB_H)
-TabGrid.CellPadding = UDim2.new(0, TAB_PAD, 0, TAB_PAD)
-TabGrid.SortOrder = Enum.SortOrder.LayoutOrder
 
--- Content
+--============================================================
+-- CONTENT
+--============================================================
 local Content = Instance.new("Frame")
 Content.Name = "Content"
-Content.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+Content.Size = UDim2.new(1, -PAD*2, 1, -(TOP_CONTENT + PAD))
+Content.Position = UDim2.new(0, PAD, 0, TOP_CONTENT)
+Content.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
 Content.BackgroundTransparency = 0.2
 Content.BorderSizePixel = 0
 Content.Parent = Main
 Instance.new("UICorner", Content)
 local ContentStroke = Instance.new("UIStroke", Content)
 ContentStroke.Thickness = 1.5
-ContentStroke.Color = Color3.fromRGB(86, 86, 86)
+ContentStroke.Color = Color3.fromRGB(120, 120, 140)
 
-local Pages = {}
-local TabButtons = {}
-local ActiveTabName = nil
-local TabOrder = {}
-local CONTENT_MIN_H = 220
-
--- Forward declarations
-local recalcLayout
+--============================================================
+-- PAGE / TAB BUTTON BUILDERS
+--============================================================
+local Pages       = {}
+local TabButtons  = {}
+local TabOrder    = {}
 
 local function buildPage(name)
     local page = Instance.new("ScrollingFrame")
     page.Name = name
+    page.Size = UDim2.new(1, -8, 1, -8)
+    page.Position = UDim2.new(0, 4, 0, 4)
     page.BackgroundTransparency = 1
     page.BorderSizePixel = 0
     page.ScrollBarThickness = 4
-    page.ScrollBarImageColor3 = Color3.fromRGB(120, 120, 120)
+    page.ScrollBarImageColor3 = Color3.fromRGB(140, 140, 160)
     page.ScrollingDirection = Enum.ScrollingDirection.Y
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
     page.AutomaticCanvasSize = Enum.AutomaticSize.Y
     page.Visible = false
     page.Parent = Content
-
-    local pad = Instance.new("UIPadding", page)
-    pad.PaddingTop = UDim.new(0, 4)
-    pad.PaddingBottom = UDim.new(0, 4)
-    pad.PaddingLeft = UDim.new(0, 4)
-    pad.PaddingRight = UDim.new(0, 4)
 
     local lay = Instance.new("UIListLayout", page)
     lay.Padding = UDim.new(0, 4)
@@ -315,14 +297,25 @@ local function buildPage(name)
 
     Pages[name] = page
     table.insert(TabOrder, name)
-    return page
 end
 
-local function buildTabButton(name)
+local function switchTab(name)
+    for n, p in pairs(Pages) do p.Visible = (n == name) end
+    for n, b in pairs(TabButtons) do
+        TweenService:Create(b, TweenInfo.new(0.15), {
+            BackgroundColor3 = (n == name)
+                and Color3.fromRGB(110, 120, 190)
+                or  Color3.fromRGB(70, 70, 80),
+        }):Play()
+    end
+end
+
+local function buildTabButton(name, index)
     local b = Instance.new("TextButton")
     b.Name = name
-    b.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    b.BackgroundTransparency = 0.2
+    b.Size = UDim2.new(0, TAB_W, 1, 0)
+    b.Position = UDim2.new(0, (index - 1) * (TAB_W + TAB_GAP), 0, 0)
+    b.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
     b.Text = name
     b.TextColor3 = Color3.fromRGB(255, 255, 255)
     b.Font = Enum.Font.SourceSansPro
@@ -330,41 +323,22 @@ local function buildTabButton(name)
     b.BorderSizePixel = 0
     b.Parent = TabBar
     Instance.new("UICorner", b)
+
     local st = Instance.new("UIStroke", b)
     st.Thickness = 2
-    st.Color = Color3.fromRGB(86, 86, 86)
+    st.Color = Color3.fromRGB(120, 120, 140)
 
-    b.MouseButton1Click:Connect(function()
-        for n, p in pairs(Pages) do p.Visible = (n == name) end
-        ActiveTabName = name
-        for n, btn in pairs(TabButtons) do
-            TweenService:Create(btn, TweenInfo.new(0.15), {
-                BackgroundColor3 = (n == name) and Color3.fromRGB(110, 120, 190) or Color3.fromRGB(70, 70, 70),
-            }):Play()
-        end
-    end)
+    b.MouseButton1Click:Connect(function() switchTab(name) end)
     TabButtons[name] = b
 end
 
 --============================================================
 -- WIDGETS
 --============================================================
-local function forceCanvas(page)
-    task.defer(function()
-        if not page or not page.Parent then return end
-        local lay = page:FindFirstChildOfClass("UIListLayout")
-        if lay then
-            page.CanvasSize = UDim2.new(0, 0, 0, lay.AbsoluteContentSize.Y + 12)
-        end
-    end)
-end
-
-local function createToggle(parent, name)
-    local page = parent
+local function createToggle(page, name)
     local b = Instance.new("TextButton")
     b.Size = UDim2.new(1, 0, 0, 26)
-    b.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-    b.BackgroundTransparency = 0.1
+    b.BackgroundColor3 = Color3.fromRGB(80, 80, 95)
     b.Text = name
     b.TextColor3 = Color3.fromRGB(255, 255, 255)
     b.Font = Enum.Font.SourceSansPro
@@ -376,7 +350,7 @@ local function createToggle(parent, name)
 
     local stroke = Instance.new("UIStroke", b)
     stroke.Thickness = 2
-    stroke.Color = Color3.fromRGB(110, 110, 130)
+    stroke.Color = Color3.fromRGB(120, 120, 140)
 
     local pad = Instance.new("UIPadding", b)
     pad.PaddingLeft = UDim.new(0, 10)
@@ -384,16 +358,16 @@ local function createToggle(parent, name)
     local dot = Instance.new("Frame")
     dot.Size = UDim2.new(0, 10, 0, 10)
     dot.Position = UDim2.new(1, -18, 0.5, -5)
-    dot.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    dot.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
     dot.BorderSizePixel = 0
     dot.Parent = b
     Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
 
     local state = Config:get(name)
     local function refresh()
-        dot.BackgroundColor3 = state and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(80, 80, 80)
+        dot.BackgroundColor3 = state and Color3.fromRGB(90, 220, 130) or Color3.fromRGB(80, 80, 90)
         TweenService:Create(b, TweenInfo.new(0.15), {
-            BackgroundColor3 = state and Color3.fromRGB(60, 130, 80) or Color3.fromRGB(80, 80, 90),
+            BackgroundColor3 = state and Color3.fromRGB(60, 130, 80) or Color3.fromRGB(80, 80, 95),
         }):Play()
     end
     refresh()
@@ -412,29 +386,25 @@ local function createToggle(parent, name)
         Config:set(name, state)
         refresh()
     end)
-
-    forceCanvas(page)
 end
 
-local function createInput(parent, label, defaultVal, key)
-    local page = parent
+local function createInput(page, label, defaultVal, key)
     local holder = Instance.new("Frame")
     holder.Size = UDim2.new(1, 0, 0, 52)
-    holder.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-    holder.BackgroundTransparency = 0.1
+    holder.BackgroundColor3 = Color3.fromRGB(80, 80, 95)
     holder.BorderSizePixel = 0
     holder.Parent = page
     Instance.new("UICorner", holder)
     local stroke = Instance.new("UIStroke", holder)
     stroke.Thickness = 2
-    stroke.Color = Color3.fromRGB(110, 110, 130)
+    stroke.Color = Color3.fromRGB(120, 120, 140)
 
     local lbl = Instance.new("TextLabel")
     lbl.Size = UDim2.new(1, -16, 0, 18)
     lbl.Position = UDim2.new(0, 8, 0, 2)
     lbl.BackgroundTransparency = 1
     lbl.Text = label
-    lbl.TextColor3 = Color3.fromRGB(220, 220, 240)
+    lbl.TextColor3 = Color3.fromRGB(230, 230, 245)
     lbl.Font = Enum.Font.SourceSansPro
     lbl.TextSize = 12
     lbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -446,7 +416,6 @@ local function createInput(parent, label, defaultVal, key)
     box.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     box.Text = tostring(defaultVal)
     box.TextColor3 = Color3.fromRGB(255, 255, 255)
-    box.PlaceholderText = "number"
     box.Font = Enum.Font.Code
     box.TextSize = 13
     box.BorderSizePixel = 0
@@ -461,84 +430,38 @@ local function createInput(parent, label, defaultVal, key)
             Log:info(label .. " = " .. num)
         else
             box.Text = tostring(Config:getValue(key))
-            Log:warn("Invalid number for " .. label)
+            Log:warn("Invalid number")
         end
     end)
-
-    forceCanvas(page)
 end
 
 --============================================================
--- AUTO-RESIZE
+-- AUTO-FIT HEIGHT
 --============================================================
-function recalcLayout()
-    -- Tab grid height (wraps to multiple rows if needed)
-    local n = #TabOrder
-    local perRow = math.max(1, math.floor((Main.AbsoluteSize.X - CONTENT_PAD * 2 + TAB_PAD) / (TAB_W + TAB_PAD)))
-    -- Use target width instead of AbsoluteSize since we are resizing
-    local targetW = math.max(Main.AbsoluteSize.X, 480)
-    perRow = math.max(1, math.floor((targetW - CONTENT_PAD * 2 + TAB_PAD) / (TAB_W + TAB_PAD)))
-    local rows = math.ceil(n / perRow)
-    local tabH = rows * (TAB_H + TAB_PAD) - TAB_PAD
-
-    -- Content height from largest page
-    local maxContentH = CONTENT_MIN_H
+local function recalcHeight()
+    local maxH = 200
     for _, page in pairs(Pages) do
         local lay = page:FindFirstChildOfClass("UIListLayout")
         if lay then
-            maxContentH = math.max(maxContentH, lay.AbsoluteContentSize.Y + 16)
+            maxH = math.max(maxH, lay.AbsoluteContentSize.Y)
         end
     end
-
-    local totalH = TOP_PAD + TITLE_H + 6 + tabH + CONTENT_PAD + maxContentH + CONTENT_PAD
-    local totalW = math.max(480, CONTENT_PAD * 2 + perRow * (TAB_W + TAB_PAD) - TAB_PAD)
-    totalW = math.max(totalW, 480)
-
-    -- Apply
-    Main.Size = UDim2.new(0, totalW, 0, totalH)
-
-    TitleBar.Size  = UDim2.new(1, -CONTENT_PAD * 2, 0, TITLE_H)
-    TitleBar.Position = UDim2.new(0, CONTENT_PAD, 0, TOP_PAD)
-
-    Title.Size = UDim2.new(1, -80, 1, 0)
-    Title.Position = UDim2.new(0, 8, 0, 0)
-
-    CloseBtn.Position = UDim2.new(1, -22, 0, 4)
-    MinBtn.Position   = UDim2.new(1, -46, 0, 4)
-
-    TabBar.Size = UDim2.new(1, -CONTENT_PAD * 2, 0, tabH)
-    TabBar.Position = UDim2.new(0, CONTENT_PAD, 0, TOP_PAD + TITLE_H + 6)
-
-    Content.Size = UDim2.new(1, -CONTENT_PAD * 2, 0, maxContentH + CONTENT_PAD * 2)
-    Content.Position = UDim2.new(0, CONTENT_PAD, 0, TOP_PAD + TITLE_H + 6 + tabH + CONTENT_PAD)
-
-    for _, page in pairs(Pages) do
-        page.Size = UDim2.new(1, 0, 1, 0)
-        page.Position = UDim2.new(0, 0, 0, 0)
-    end
+    local newH = math.clamp(TOP_CONTENT + maxH + PAD + 20, 320, 720)
+    Main.Size = UDim2.new(0, UI_W, 0, newH)
+    Log:info("Window fit -> " .. math.floor(newH) .. "px tall")
 end
-
--- Auto-recalc whenever AbsoluteSize changes internally
-Main:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-    -- debounce
-    if Main:GetAttribute("resizing") then return end
-    Main:SetAttribute("resizing", true)
-    task.delay(0.05, function()
-        Main:SetAttribute("resizing", false)
-    end)
-end)
 
 --============================================================
 -- MODULES — REAL VAPEV4 CODE
 --============================================================
 
--- Speed (from Blatant/Speed.lua)
+-- SPEED — adapted from Blatant/Speed.lua
 register("Speed", function(state)
     if not state then
-        local char = lplr.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then hum.WalkSpeed = 16 end
+        local c = lplr.Character
+        if c then
+            local h = c:FindFirstChildOfClass("Humanoid")
+            if h then h.WalkSpeed = 16 end
         end
         return
     end
@@ -549,15 +472,15 @@ register("Speed", function(state)
 
     local function updateFriction(enable)
         if not enable then
-            for part, old in pairs(frictionParts) do
-                if part and part.Parent then part.CustomPhysicalProperties = old end
+            for p, old in pairs(frictionParts) do
+                if p and p.Parent then p.CustomPhysicalProperties = old end
             end
             frictionParts = {}
             return
         end
-        local char = lplr.Character
-        if not char then return end
-        for _, part in ipairs(char:GetDescendants()) do
+        local c = lplr.Character
+        if not c then return end
+        for _, part in ipairs(c:GetDescendants()) do
             if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
                 if not frictionParts[part] then
                     frictionParts[part] = part.CustomPhysicalProperties
@@ -569,57 +492,57 @@ register("Speed", function(state)
     updateFriction(true)
 
     local conn = RunService.PreSimulation:Connect(function(dt)
-        local char = lplr.Character
-        if not char then return end
-        local root = char:FindFirstChild("HumanoidRootPart")
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if not root or not humanoid or humanoid.Health <= 0 then return end
-        local st = humanoid:GetState()
+        local c = lplr.Character
+        if not c then return end
+        local root = c:FindFirstChild("HumanoidRootPart")
+        local hum  = c:FindFirstChildOfClass("Humanoid")
+        if not root or not hum or hum.Health <= 0 then return end
+        local st = hum:GetState()
         if st == Enum.HumanoidStateType.Climbing then return end
 
         local velo = (root.AssemblyLinearVelocity * Vector3.new(1,0,1)).Magnitude
-        local moveDir = humanoid.MoveDirection
+        local moveDir = hum.MoveDirection
         local target = Config:getValue("speed") or 23
-        local destination = moveDir * math.max(target - velo, 0) * dt
+        local dest = moveDir * math.max(target - velo, 0) * dt
 
-        rayCheck.FilterDescendantsInstances = { char, Workspace.CurrentCamera }
+        rayCheck.FilterDescendantsInstances = { c, Workspace.CurrentCamera }
         rayCheck.CollisionGroup = root.CollisionGroup
-        local ray = Workspace:Raycast(root.Position, destination, rayCheck)
-        if ray then destination = (ray.Position + ray.Normal) - root.Position end
+        local ray = Workspace:Raycast(root.Position, dest, rayCheck)
+        if ray then dest = (ray.Position + ray.Normal) - root.Position end
 
-        root.CFrame = root.CFrame + destination
+        root.CFrame = root.CFrame + dest
         root.AssemblyLinearVelocity = (moveDir * velo) + Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
 
         if (st == Enum.HumanoidStateType.Running or st == Enum.HumanoidStateType.Landed)
             and moveDir ~= Vector3.zero then
-            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
         end
     end)
 
     return function() conn:Disconnect(); updateFriction(false) end
 end)
 
--- Killaura (from Blatant/Killaura.lua)
+-- KILLAURA — adapted from Blatant/Killaura.lua
 register("Killaura", function(state)
     if not state then return end
-    local AttackRemote = ReplicatedStorage:FindFirstChild("AttackEntity", true)
+    local remote = ReplicatedStorage:FindFirstChild("AttackEntity", true)
         or ReplicatedStorage:FindFirstChild("SwordRemote", true)
-    if not AttackRemote then Log:warn("Killaura: remote not found") return end
+    if not remote then Log:warn("Killaura: remote not found") return end
 
     local conn = RunService.Heartbeat:Connect(function()
-        local char = lplr.Character
-        if not char or not char.PrimaryPart then return end
-        local tool = char:FindFirstChildWhichIsA("Tool")
+        local c = lplr.Character
+        if not c or not c.PrimaryPart then return end
+        local tool = c:FindFirstChildWhichIsA("Tool")
         if not tool then return end
 
-        local selfpos = char.PrimaryPart.Position
-        local facing = char.PrimaryPart.CFrame.LookVector * Vector3.new(1,0,1)
+        local selfpos = c.PrimaryPart.Position
+        local facing = c.PrimaryPart.CFrame.LookVector * Vector3.new(1,0,1)
 
         local best, bestD = nil, math.huge
         for _, p in ipairs(Players:GetPlayers()) do
             if p == lplr or not p.Character or not p.Character.PrimaryPart then continue end
-            local hum = p.Character:FindFirstChildOfClass("Humanoid")
-            if not hum or hum.Health <= 0 then continue end
+            local h = p.Character:FindFirstChildOfClass("Humanoid")
+            if not h or h.Health <= 0 then continue end
             local delta = p.Character.PrimaryPart.Position - selfpos
             local d = delta.Magnitude
             if d > 28 then continue end
@@ -629,46 +552,46 @@ register("Killaura", function(state)
         end
 
         if best then
-            local tRoot = best.Character.PrimaryPart
-            local dir = CFrame.lookAt(selfpos, tRoot.Position).LookVector
+            local tr = best.Character.PrimaryPart
+            local dir = CFrame.lookAt(selfpos, tr.Position).LookVector
             local pos = selfpos + dir * math.max(bestD - 14.399, 0)
             pcall(function()
-                AttackRemote:FireServer({
+                remote:FireServer({
                     weapon = tool,
                     chargedAttack = { chargeRatio = 0 },
                     entityInstance = best.Character,
                     validate = {
                         raycast = { cameraPosition = { value = pos }, cursorDirection = { value = dir } },
-                        targetPosition = { value = tRoot.Position },
+                        targetPosition = { value = tr.Position },
                         selfPosition = { value = pos }
                     }
                 })
             end)
-            char.PrimaryPart.CFrame = CFrame.lookAt(
-                selfpos, Vector3.new(tRoot.Position.X, selfpos.Y + 0.001, tRoot.Position.Z))
+            c.PrimaryPart.CFrame = CFrame.lookAt(selfpos,
+                Vector3.new(tr.Position.X, selfpos.Y + 0.001, tr.Position.Z))
         end
     end)
     return function() conn:Disconnect() end
 end)
 
--- Fly (from Blatant/Fly.lua)
+-- FLY — adapted from Blatant/Fly.lua
 register("Fly", function(state)
     if not state then
-        local char = lplr.Character
-        if char and char.PrimaryPart then
-            local bv = char.PrimaryPart:FindFirstChild("PrismFly")
+        local c = lplr.Character
+        if c and c.PrimaryPart then
+            local bv = c.PrimaryPart:FindFirstChild("PrismFly")
             if bv then bv:Destroy() end
         end
         return
     end
-    local char = lplr.Character
-    if not char or not char.PrimaryPart then return end
+    local c = lplr.Character
+    if not c or not c.PrimaryPart then return end
 
     local bv = Instance.new("BodyVelocity")
     bv.Name = "PrismFly"
     bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
     bv.Velocity = Vector3.zero
-    bv.Parent = char.PrimaryPart
+    bv.Parent = c.PrimaryPart
 
     local cam = Workspace.CurrentCamera
     local conn = RunService.PreSimulation:Connect(function()
@@ -679,24 +602,22 @@ register("Fly", function(state)
     return function() conn:Disconnect(); bv:Destroy() end
 end)
 
--- NoFall (from Blatant/NoFall.lua)
+-- NOFALL — adapted from Blatant/NoFall.lua
 register("NoFall", function(state)
     if not state then return end
     local rayParams = RaycastParams.new()
-    local tracked = 0
-    local extraGravity = 0
-
+    local tracked, extraGravity = 0, 0
     local conn = RunService.PreSimulation:Connect(function(dt)
-        local char = lplr.Character
-        if not char then return end
-        local root = char:FindFirstChild("HumanoidRootPart")
-        local hum = char:FindFirstChildOfClass("Humanoid")
+        local c = lplr.Character
+        if not c then return end
+        local root = c:FindFirstChild("HumanoidRootPart")
+        local hum  = c:FindFirstChildOfClass("Humanoid")
         if not root or not hum then return end
         if root.AssemblyLinearVelocity.Y < -85 then
-            rayParams.FilterDescendantsInstances = { char, Workspace.CurrentCamera }
-            local rootSize = root.Size.Y / 2 + hum.HipHeight
+            rayParams.FilterDescendantsInstances = { c, Workspace.CurrentCamera }
+            local rSize = root.Size.Y/2 + hum.HipHeight
             local ray = Workspace:Blockcast(root.CFrame, Vector3.new(3,3,3),
-                Vector3.new(0, (tracked * 0.1) - rootSize, 0), rayParams)
+                Vector3.new(0, (tracked*0.1) - rSize, 0), rayParams)
             if not ray then
                 root.AssemblyLinearVelocity = Vector3.new(
                     root.AssemblyLinearVelocity.X, -86, root.AssemblyLinearVelocity.Z)
@@ -711,23 +632,23 @@ register("NoFall", function(state)
     return function() conn:Disconnect() end
 end)
 
--- TPWalk (Vape pattern)
+-- TPWALK — Vape-style with input
 register("TPWalk", function(state)
     if not state then return end
     local conn = RunService.Heartbeat:Connect(function(dt)
-        local char = lplr.Character
-        if not char then return end
-        local root = char:FindFirstChild("HumanoidRootPart")
-        local hum  = char:FindFirstChildOfClass("Humanoid")
+        local c = lplr.Character
+        if not c then return end
+        local root = c:FindFirstChild("HumanoidRootPart")
+        local hum  = c:FindFirstChildOfClass("Humanoid")
         if root and hum and hum.MoveDirection.Magnitude > 0 then
-            local speed = Config:getValue("tpwalk") or 60
-            root.CFrame = root.CFrame + hum.MoveDirection * speed * dt
+            local sp = Config:getValue("tpwalk") or 60
+            root.CFrame = root.CFrame + hum.MoveDirection * sp * dt
         end
     end)
     return function() conn:Disconnect() end
 end)
 
--- Extra stubs
+-- Simple stubs
 register("TriggerBot", function(state)
     if not state then return end
     local mouse = lplr:GetMouse()
@@ -737,8 +658,8 @@ register("TriggerBot", function(state)
         if not mouse.Target then return end
         local m = mouse.Target:FindFirstAncestorWhichIsA("Model")
         if not m then return end
-        local hum = m:FindFirstChildOfClass("Humanoid")
-        if not hum or hum.Health <= 0 then return end
+        local h = m:FindFirstChildOfClass("Humanoid")
+        if not h or h.Health <= 0 then return end
         local p = Players:GetPlayerFromCharacter(m)
         if not p or p == lplr then return end
         local mr = lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart")
@@ -781,48 +702,49 @@ buildPage("Player")
 buildPage("Settings")
 buildPage("Console")
 
-for _, n in ipairs({"Blatant","Combat","Movement","Player","Settings","Console"}) do
-    buildTabButton(n)
+for i, n in ipairs(TabOrder) do
+    buildTabButton(n, i)
 end
 
--- Blatant tab
+-- Blatant
 createToggle(Pages["Blatant"], "Speed")
+createInput (Pages["Blatant"], "Speed (studs/sec)",  Config:getValue("speed") or 23, "speed")
 createToggle(Pages["Blatant"], "Killaura")
 createToggle(Pages["Blatant"], "Fly")
 createToggle(Pages["Blatant"], "NoFall")
 createToggle(Pages["Blatant"], "TPWalk")
-createInput(Pages["Blatant"], "Speed (studs/sec)", Config:getValue("speed") or 23, "speed")
-createInput(Pages["Blatant"], "TPWalk (studs/sec)", Config:getValue("tpwalk") or 60, "tpwalk")
+createInput (Pages["Blatant"], "TPWalk (studs/sec)", Config:getValue("tpwalk") or 60, "tpwalk")
 
--- Combat tab
+-- Combat
 createToggle(Pages["Combat"], "TriggerBot")
 
--- Movement tab
+-- Movement
 createToggle(Pages["Movement"], "InfiniteJump")
 
--- Player tab
+-- Player
 createToggle(Pages["Player"], "Fullbright")
 
 --============================================================
 -- SETTINGS TAB
 --============================================================
 do
+    local page = Pages["Settings"]
+
     local holder = Instance.new("Frame")
     holder.Size = UDim2.new(1, 0, 0, 50)
-    holder.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-    holder.BackgroundTransparency = 0.1
+    holder.BackgroundColor3 = Color3.fromRGB(80, 80, 95)
     holder.BorderSizePixel = 0
-    holder.Parent = Pages["Settings"]
+    holder.Parent = page
     Instance.new("UICorner", holder)
     local st = Instance.new("UIStroke", holder)
-    st.Thickness = 2; st.Color = Color3.fromRGB(110, 110, 130)
+    st.Thickness = 2; st.Color = Color3.fromRGB(120, 120, 140)
 
     local lbl = Instance.new("TextLabel")
     lbl.Size = UDim2.new(1, -16, 0, 18)
     lbl.Position = UDim2.new(0, 8, 0, 2)
     lbl.BackgroundTransparency = 1
     lbl.Text = "Transparency: " .. string.format("%.2f", Config.data.settings.transparency)
-    lbl.TextColor3 = Color3.fromRGB(220,220,240)
+    lbl.TextColor3 = Color3.fromRGB(230, 230, 245)
     lbl.Font = Enum.Font.SourceSansPro
     lbl.TextSize = 12
     lbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -831,7 +753,7 @@ do
     local slider = Instance.new("Frame")
     slider.Size = UDim2.new(1, -16, 0, 10)
     slider.Position = UDim2.new(0, 8, 0, 24)
-    slider.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    slider.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
     slider.BorderSizePixel = 0
     slider.Parent = holder
     Instance.new("UICorner", slider)
@@ -860,42 +782,38 @@ do
         end
     end)
 
-    local function actionBtn(text, cb, order)
+    local function actionBtn(text, order, cb)
         local b = Instance.new("TextButton")
         b.Size = UDim2.new(1, 0, 0, 26)
-        b.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-        b.BackgroundTransparency = 0.1
+        b.BackgroundColor3 = Color3.fromRGB(80, 80, 95)
         b.Text = text
         b.TextColor3 = Color3.fromRGB(255, 255, 255)
         b.Font = Enum.Font.SourceSansPro
         b.TextSize = 13
         b.BorderSizePixel = 0
         b.LayoutOrder = order
-        b.Parent = Pages["Settings"]
+        b.Parent = page
         Instance.new("UICorner", b)
         local st2 = Instance.new("UIStroke", b)
-        st2.Thickness = 2; st2.Color = Color3.fromRGB(110, 110, 130)
+        st2.Thickness = 2; st2.Color = Color3.fromRGB(120, 120, 140)
         b.MouseButton1Click:Connect(cb)
-        forceCanvas(Pages["Settings"])
     end
 
-    actionBtn("Fit Window to Content", function()
-        recalcLayout()
-        Log:info("Window refit")
-    end, 100)
-    actionBtn("Save Config", function() Config:save() end, 101)
-    actionBtn("Load Config", function()
+    actionBtn("Fit Window to Content", 100, recalcHeight)
+    actionBtn("Save Config", 101, function() Config:save() Log:info("Saved") end)
+    actionBtn("Load Config", 102, function()
         Config:load()
         Main.BackgroundTransparency = Config.data.settings.transparency
-    end, 102)
-    actionBtn("Reset All Modules", function()
+        Log:info("Loaded")
+    end)
+    actionBtn("Reset All Modules", 103, function()
         for name in pairs(Modules) do
             if ActiveCleanup[name] then pcall(ActiveCleanup[name]); ActiveCleanup[name] = nil end
             Config.data.toggles[name] = false
         end
         Config:save()
         Log:info("All modules reset")
-    end, 103)
+    end)
 end
 
 --============================================================
@@ -905,7 +823,7 @@ do
     local page = Pages["Console"]
 
     local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, 0, 0, 200)
+    scroll.Size = UDim2.new(1, 0, 0, 220)
     scroll.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
     scroll.BorderSizePixel = 0
     scroll.ScrollBarThickness = 4
@@ -923,17 +841,15 @@ do
 
     local lay = Instance.new("UIListLayout", scroll)
     lay.Padding = UDim.new(0, 0)
-    lay.SortOrder = Enum.SortOrder.LayoutOrder
 
     Log.listFrame = scroll
 
     local function btn(text, order, cb)
         local b = Instance.new("TextButton")
         b.Size = UDim2.new(1, 0, 0, 24)
-        b.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-        b.BackgroundTransparency = 0.1
+        b.BackgroundColor3 = Color3.fromRGB(80, 80, 95)
         b.Text = text
-        b.TextColor3 = Color3.fromRGB(255,255,255)
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
         b.Font = Enum.Font.SourceSansPro
         b.TextSize = 12
         b.BorderSizePixel = 0
@@ -941,22 +857,22 @@ do
         b.Parent = page
         Instance.new("UICorner", b)
         local st = Instance.new("UIStroke", b)
-        st.Thickness = 2; st.Color = Color3.fromRGB(110, 110, 130)
+        st.Thickness = 2; st.Color = Color3.fromRGB(120, 120, 140)
         b.MouseButton1Click:Connect(cb)
     end
 
-    btn("Copy Log",      2, function() Log:copyAll() end)
-    btn("Copy Errors",   3, function()
+    btn("Copy Full Log", 2, function() Log:copyAll() end)
+    btn("Copy Errors Only", 3, function()
         local errs = {}
         for _, l in ipairs(Log.lines) do
             if l:find("%[ERROR%]") then table.insert(errs, l) end
         end
         if setclipboard then
             setclipboard(table.concat(errs, "\n"))
-            Log:info("Copied " .. #errs .. " error lines")
+            Log:info("Copied " .. #errs .. " errors")
         end
     end)
-    btn("Clear Console", 4, function() Log:clear(); Log:info("Console cleared") end)
+    btn("Clear Console", 4, function() Log:clear(); Log:info("Cleared") end)
 end
 
 --============================================================
@@ -992,36 +908,20 @@ end
 --============================================================
 -- INIT
 --============================================================
-Log:refresh()
-Log:info("Prismware v2 loaded")
-Log:info("Real VapeV4 modules: Speed, Killaura, Fly, NoFall")
+Log:info("Prismware v3 loaded")
+Log:info("Tabs: " .. table.concat(TabOrder, ", "))
 
--- Set initial tab
-for n, p in pairs(Pages) do p.Visible = (n == "Blatant") end
-ActiveTabName = "Blatant"
-if TabButtons["Blatant"] then
-    TabButtons["Blatant"].BackgroundColor3 = Color3.fromRGB(110, 120, 190)
-end
+-- Default tab
+switchTab("Blatant")
 
--- Initial size + recalc after everything is laid out
-Main.Size = UDim2.new(0, 480, 0, 300)
-task.defer(function()
-    task.wait(0.1)
-    recalcLayout()
-    -- Recalc again after layouts settle
-    task.wait(0.15)
-    recalcLayout()
+-- Auto-fit the window height based on tallest page
+task.spawn(function()
+    task.wait(0.3)
+    local ok, err = pcall(recalcHeight)
+    if not ok then Log:error("recalcHeight: " .. tostring(err)) end
+    task.wait(0.3)
+    pcall(recalcHeight)
 end)
-
--- Auto-recalc on tab add / page changes
-for _, page in pairs(Pages) do
-    local lay = page:FindFirstChildOfClass("UIListLayout")
-    if lay then
-        lay:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            forceCanvas(page)
-        end)
-    end
-end
 
 -- Keybind
 UserInputService.InputBegan:Connect(function(i, gp)
